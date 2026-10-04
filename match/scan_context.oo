@@ -1,0 +1,76 @@
+// # Scan Context - Windowed Hit Production For Context Flags
+//
+// Logline: Emits matches plus their before and after neighbor lines as ordered Hit records.
+//
+// Setup: Pure line-window expansion over caller-supplied text. Used only when context is requested.
+//
+// Beats:
+//   1. Split the body once so every line, even empty ones, carries a number.
+//   2. Select matching indices under the word policy and per-file match cap.
+//   3. Emit the merged context windows ascending, flagging neighbors as context.
+
+import "std/fs/os/fs.oo";
+import "scan_lines.oo";
+import "locate_span.oo";
+import "search_opts.oo";
+
+pub fn scan_lines_context(fs: &FsReadCap, path: String, re: Regex, o: SearchOpts) -> List[Hit] {
+    let r: Result[String, String] = fs_read_file(fs, path);
+    if r.is_err() {
+        let none: List[Hit] = list_new();
+        return none;
+    }
+    let body: String = match r { Ok(s) => s, Err(_) => "" };
+    return scan_text_context(path, body, re, o);
+}
+
+pub fn scan_text_context(path: String, body: String, re: Regex, o: SearchOpts) -> List[Hit] {
+    let mut hits: List[Hit] = list_new();
+    if scan_is_binary(body) { return hits; }
+    let lines: List[String] = split_lines(body);
+    let total: Int = list_len(lines);
+    let mut sel: List[Int] = list_new();
+    let mut kept: Int = 0;
+    let mut i: Int = 0;
+    while i < total {
+        if select_line(re, o, list_get(lines, i)) {
+            if o.max_count <= 0 || kept < o.max_count {
+                sel = list_push(sel, i);
+                kept = kept + 1;
+            }
+        }
+        i = i + 1;
+    }
+    let ns: Int = list_len(sel);
+    if ns == 0 { return hits; }
+
+    // Emit the union of match windows, ascending, merging overlaps. Both the
+    // emission cursor and the match pointer only move forward.
+    let mut p: Int = 0;
+    let mut m: Int = 0;
+    let mut last: Int = 0 - 1;
+    while p < ns {
+        let s: Int = list_get(sel, p);
+        let mut lo: Int = s - o.ctx_before;
+        if lo < 0 { lo = 0; }
+        if lo <= last { lo = last + 1; }
+        let mut hi: Int = s + o.ctx_after;
+        if hi > total - 1 { hi = total - 1; }
+        let mut j: Int = lo;
+        while j <= hi {
+            while m < ns && list_get(sel, m) < j { m = m + 1; }
+            let is_match: Bool = m < ns && list_get(sel, m) == j;
+            let line: String = list_get(lines, j);
+            if is_match {
+                let sp: LineSpan = locate_span(re, line, o.pattern, o.ignore_case);
+                hits = list_push(hits, Hit { path: path, line_no: j + 1, line_text: line, col: sp.col, match_len: sp.len, context: false });
+            } else {
+                hits = list_push(hits, Hit { path: path, line_no: j + 1, line_text: line, col: 0, match_len: 0, context: true });
+            }
+            last = j;
+            j = j + 1;
+        }
+        p = p + 1;
+    }
+    return hits;
+}

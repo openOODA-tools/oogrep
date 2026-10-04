@@ -1,0 +1,122 @@
+// # Gitignore Rules - Ignore File Parsing And Matching
+//
+// Logline: Parses .gitignore files and tests candidate paths against the stacked rules.
+//
+// Setup: Pure parsing and matching over caller supplied rule lists. One loader reads under FsReadCap.
+//
+// Beats:
+//   1. Parse one .gitignore body into rules anchored at its directory.
+//   2. Test a candidate path against the stacked rules, last match wins.
+//   3. Load and parse the .gitignore sitting in a directory, if any.
+// Honest subset of git semantics: *, ?, ! negation, trailing slash for
+// directories, leading slash anchoring. No [...] classes, no backslash
+// escapes. The std glob star already crosses slashes, so ** needs no
+// special case and behaves exactly like *.
+
+import "std/fs/os/fs.oo";
+import "std/fs/file/glob.oo";
+import "filter_by_glob.oo";
+
+pub type IgnoreRule = struct {
+    base: String,
+    pat: String,
+    neg: Bool,
+    dir_only: Bool,
+    anchored: Bool
+};
+
+fn strip_trailing_slash(s: String) -> String {
+    let mut out: String = s;
+    while chars_len(out) > 0 && char_at(out, chars_len(out) - 1) == "/" {
+        out = str_slice(out, 0, chars_len(out) - 1);
+    }
+    return out;
+}
+
+fn parse_line(base: String, raw: String) -> List[IgnoreRule] {
+    let line: String = str_trim(raw);
+    let none: List[IgnoreRule] = list_new();
+    if chars_len(line) == 0 { return none; }
+    if char_at(line, 0) == "#" { return none; }
+    let mut neg: Bool = false;
+    let mut pat: String = line;
+    if char_at(pat, 0) == "!" {
+        neg = true;
+        pat = str_slice(pat, 1, chars_len(pat));
+    }
+    let mut dir_only: Bool = false;
+    if chars_len(pat) > 0 && char_at(pat, chars_len(pat) - 1) == "/" {
+        dir_only = true;
+        pat = str_slice(pat, 0, chars_len(pat) - 1);
+    }
+    let leading: Bool = chars_len(pat) > 0 && char_at(pat, 0) == "/";
+    if leading {
+        pat = str_slice(pat, 1, chars_len(pat));
+    }
+    if chars_len(pat) == 0 { return none; }
+    let anchored: Bool = leading || str_contains(pat, "/");
+    let one: List[IgnoreRule] = list_new();
+    return list_push(one, IgnoreRule { base: base, pat: pat, neg: neg, dir_only: dir_only, anchored: anchored });
+}
+
+pub fn parse_gitignore(base: String, body: String) -> List[IgnoreRule] {
+    let mut out: List[IgnoreRule] = list_new();
+    let lines: List[String] = str_split(body, "\n");
+    let n: Int = list_len(lines);
+    let mut i: Int = 0;
+    while i < n {
+        let got: List[IgnoreRule] = parse_line(base, list_get(lines, i));
+        if list_len(got) > 0 {
+            out = list_push(out, list_get(got, 0));
+        }
+        i = i + 1;
+    }
+    return out;
+}
+
+pub fn load_gitignore(fs: &FsReadCap, dir: String) -> List[IgnoreRule] {
+    let base: String = strip_trailing_slash(dir);
+    let r: Result[String, String] = fs_read_file(fs, base + "/.gitignore");
+    if r.is_err() {
+        let none: List[IgnoreRule] = list_new();
+        return none;
+    }
+    let body: String = match r { Ok(s) => s, Err(_) => "" };
+    return parse_gitignore(base, body);
+}
+
+fn rel_path(base: String, path: String) -> String {
+    let prefix: String = base + "/";
+    if str_starts_with(path, prefix) {
+        return str_slice(path, chars_len(prefix), chars_len(path));
+    }
+    return "";
+}
+
+fn rule_matches(rule: IgnoreRule, path: String, is_dir: Bool) -> Bool {
+    if rule.dir_only && !is_dir { return false; }
+    let rel: String = rel_path(rule.base, path);
+    if chars_len(rel) == 0 { return false; }
+    if rule.anchored {
+        return glob_matches(rule.pat, rel);
+    }
+    return glob_matches(rule.pat, glob_basenames(path));
+}
+
+pub fn ignore_hit(rules: List[IgnoreRule], path: String, is_dir: Bool) -> Bool {
+    let mut ignored: Bool = false;
+    let n: Int = list_len(rules);
+    let mut i: Int = 0;
+    while i < n {
+        let rule: IgnoreRule = list_get(rules, i);
+        if rule_matches(rule, path, is_dir) {
+            ignored = !rule.neg;
+        }
+        i = i + 1;
+    }
+    return ignored;
+}
+
+pub fn gitignore_probe() -> String {
+    return "gitignore-active";
+}

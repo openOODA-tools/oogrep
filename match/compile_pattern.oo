@@ -1,0 +1,23 @@
+// # Compile Pattern - Regex Admission Under Case Policy
+//
+// Logline: Compiles the caller pattern into a regex under the requested case policy, failing closed on bad syntax.
+//
+// Setup: Pure. Returns a compiled Regex or a named error string. Never returns an empty success.
+//
+// Beats:
+//   1. Reject an empty or whitespace pattern as a usage error.
+//   2. Compile under the default or case-insensitive configuration.
+//   3. Surface the engine's compile failure verbatim so the caller can report it.
+
+import "std/core/text/regex.oo";
+
+pub fn compile_pattern(pattern: String, ignore_case: Bool) -> Result[Regex, String] {
+    let p: String = str_trim(pattern);
+    if chars_len(p) == 0 {
+        return Err("empty pattern");
+    }
+    if ignore_case {
+        return regex_compile_with_config(p, regex_config_case_insensitive());
+    }
+    return regex_compile(p);
+}

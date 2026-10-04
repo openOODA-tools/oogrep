@@ -1,0 +1,171 @@
+// # Run Search - Policy To Text Pipeline
+//
+// Logline: Executes one search policy end to end and returns rendered text with match telemetry.
+//
+// Setup: Requires FsReadCap only. The single search pipeline shared by both entry points.
+//
+// Beats:
+//   1. Compile the pattern, returning a named failure instead of an empty result.
+//   2. Admit candidates, scan them, and rank the resulting hits under the emission budget.
+//   3. Render the selected output mode and report match telemetry.
+// The CLI and the MCP transport both call run_search. Neither re-implements the
+// pipeline, so a policy change lands in exactly one place.
+
+import "std/fs/os/fs.oo";
+import "std/core/text/regex.oo";
+import "search_opts.oo";
+import "walk/anchor.oo";
+import "match/anchor.oo";
+import "render/anchor.oo";
+
+pub type SearchOutcome = struct {
+    ok: Bool,
+    err: String,
+    text: String,
+    files_scanned: Int,
+    matched_files: Int,
+    total_matches: Int,
+    dropped: Int,
+    skipped: Int
+};
+
+fn failure(msg: String) -> SearchOutcome {
+    return SearchOutcome { ok: false, err: msg, text: "", files_scanned: 0, matched_files: 0, total_matches: 0, dropped: 0, skipped: 0 };
+}
+
+fn concat_hits(a: List[Hit], b: List[Hit]) -> List[Hit] {
+    let mut out: List[Hit] = a;
+    let n: Int = list_len(b);
+    let mut i: Int = 0;
+    while i < n {
+        out = list_push(out, list_get(b, i));
+        i = i + 1;
+    }
+    return out;
+}
+
+fn stdin_poll_ms() -> Int { return 200; }
+
+fn drain_stdin(fs: &FsReadCap) -> String {
+    let mut buf: String = "";
+    let mut running: Bool = true;
+    while running {
+        let r: Result[String, String] = oo_read_stdin_chunk(fs, stdin_poll_ms());
+        if !r.is_ok() {
+            running = false;
+        } else {
+            let chunk: String = match r { Ok(s) => s, Err(_) => "" };
+            if chars_len(chunk) > 0 {
+                buf = buf + chunk;
+            }
+        }
+    }
+    return buf;
+}
+
+pub fn run_search(fs: &FsReadCap, o: SearchOpts) -> SearchOutcome {
+    let cr: Result[Regex, String] = match_compile(o.pattern, o.ignore_case);
+    if cr.is_err() {
+        let m: String = match cr { Ok(_) => "compile failed", Err(e) => e };
+        return failure("invalid pattern: " + m);
+    }
+    let re: Regex = match cr { Ok(r) => r, Err(_) => return failure("invalid pattern") };
+
+    // One pass over every root in argv order. A missing explicit root fails
+    // the search the way grep does; a bare dash drains standard input.
+    let mut scanned: Int = 0;
+    let mut skipped_total: Int = 0;
+    let mut hits: List[Hit] = list_new();
+    let mut scanned_paths: List[String] = list_new();
+    let nr: Int = list_len(o.roots);
+    let mut any_dir: Bool = false;
+    let mut ri: Int = 0;
+    while ri < nr {
+        let r: String = list_get(o.roots, ri);
+        if r == "-" {
+            scanned = scanned + 1;
+            scanned_paths = list_push(scanned_paths, "(standard input)");
+            hits = concat_hits(hits, match_scan_text("(standard input)", drain_stdin(fs), re, o));
+        } else {
+            if !fs_path_exists(fs, r) {
+                return failure(r + ": No such file or directory");
+            }
+            if fs_is_dir(fs, r) { any_dir = true; }
+            let adm: Admitted = walk_admit(fs, r, o.max_depth, o.respect_ignore, o.glob);
+            let paths: List[String] = adm.paths;
+            scanned = scanned + list_len(paths);
+            skipped_total = skipped_total + adm.skipped;
+            let np: Int = list_len(paths);
+            let mut pi: Int = 0;
+            while pi < np {
+                scanned_paths = list_push(scanned_paths, list_get(paths, pi));
+                pi = pi + 1;
+            }
+            hits = concat_hits(hits, match_scan_all(fs, paths, re, o));
+        }
+        ri = ri + 1;
+    }
+
+    // The grep label rule: paths print when the search spans inputs, never
+    // for one file or one pipe, unless an explicit flag overrides either way.
+    let auto_label: Bool = nr > 1 || any_dir;
+    let show_fn: Bool = if o.filename_auto { auto_label } else { o.show_filename };
+
+    // Summary modes must report complete counts, so the emission budget is not
+    // applied to them. A clipped count is a lie; a clipped line list is honest.
+    let summary_mode: Bool = o.count_mode || o.files_only;
+    let effective_budget: Int = if summary_mode { 0 } else { o.budget };
+    let ranked: RankedHits = match_rank(hits, effective_budget, scanned_paths);
+
+    let mut total: Int = 0;
+    let tn: Int = list_len(ranked.tallies);
+    let mut ti: Int = 0;
+    while ti < tn {
+        let t: FileTally = list_get(ranked.tallies, ti);
+        total = total + t.count;
+        ti = ti + 1;
+    }
+
+    let mut body: String = "";
+    if o.json_mode {
+        let mut mode: String = "lines";
+        if o.count_mode { mode = "count"; }
+        if o.files_only { mode = "files"; }
+        body = render_json_envelope(o.pattern, mode, ranked.hits, ranked.tallies, scanned, ranked.matched_files, total, ranked.dropped, skipped_total);
+    } else if o.count_mode || o.files_only {
+        body = render_tally_lines(ranked.tallies, o.count_mode, show_fn);
+    } else {
+        let n: Int = list_len(ranked.hits);
+        let mut i: Int = 0;
+        let ctx_on: Bool = o.ctx_before > 0 || o.ctx_after > 0;
+        let mut prev_path: String = "";
+        let mut prev_line: Int = 0 - 1;
+        while i < n {
+            let h: Hit = list_get(ranked.hits, i);
+            if ctx_on && h.path == prev_path && prev_line >= 0 && h.line_no > prev_line + 1 {
+                body = body + "--\n";
+            }
+            body = body + render_line(h, o.show_lines, o.color, o.show_column, show_fn) + "\n";
+            prev_path = h.path;
+            prev_line = h.line_no;
+            i = i + 1;
+        }
+    }
+    if ranked.dropped > 0 && !o.json_mode {
+        body = body + render_clipped(ranked.dropped);
+    }
+    if o.quiet {
+        body = "";
+    }
+
+    return SearchOutcome {
+        ok: true,
+        err: "",
+        text: body,
+        files_scanned: scanned,
+        matched_files: ranked.matched_files,
+        total_matches: total,
+        dropped: ranked.dropped,
+        skipped: skipped_total
+    };
+}

@@ -1,0 +1,32 @@
+// # Filter By Kind - Size Budget Admission Gate
+//
+// Logline: Rejects candidate files that exceed the readable size budget before any content is touched.
+//
+// Setup: Requires FsReadCap for stat only. This page never reads file content.
+//
+// Beats:
+//   1. Admit a candidate when its reported size is within the budget.
+//   2. Reject oversized candidates so the scan stage never allocates them.
+//   3. Return the admitted subset preserving traversal order.
+
+import "std/fs/os/fs.oo";
+
+fn size_budget() -> Int { return 8388608; }
+
+pub fn filter_by_kind(fs: &FsReadCap, candidates: List[String]) -> List[String] {
+    let mut out: List[String] = list_new();
+    let n: Int = list_len(candidates);
+    let mut i: Int = 0;
+    while i < n {
+        let p: String = list_get(candidates, i);
+        if fs_file_size(fs, p) <= size_budget() {
+            out = list_push(out, p);
+        }
+        i = i + 1;
+    }
+    return out;
+}
+
+pub fn kind_size_budget() -> Int {
+    return size_budget();
+}

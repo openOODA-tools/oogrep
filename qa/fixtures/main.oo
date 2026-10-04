@@ -1,0 +1,19 @@
+// # QA Fixture Main - Search Target Marker
+//
+// Logline: Fixture page carrying the canonical main marker used by the oogrep test suite.
+//
+// Setup: Pure page. Never linked into the binary; it exists as searchable test data.
+//
+// Beats:
+//   1. Declare a main entry point so the fixture matches the main marker pattern.
+//   2. Carry decoy lines so invert and count assertions have material to work on.
+//   3. Remain a valid page so make check typechecks it.
+
+pub fn main() -> Result[Int, String] {
+    println("fixture-main-marker");
+    return Ok(0);
+}
+
+pub fn fixture_sidecar() -> String {
+    return "decoy";
+}

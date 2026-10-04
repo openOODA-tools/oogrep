@@ -1,0 +1,18 @@
+// # QA Fixture Deep - Nested Depth Target
+//
+// Logline: Fixture page nested one level deep so the depth bound has a target.
+//
+// Setup: Pure page. Never linked into the binary; it exists as searchable test data.
+//
+// Beats:
+//   1. Sit below the fixtures root so max-depth zero cannot reach this file.
+//   2. Carry a distinct marker so depth assertions can identify this page alone.
+//   3. Remain a valid page so make check typechecks it.
+
+pub fn deep_marker() -> String {
+    return "oogrep-deep-fixture";
+}
+
+pub fn deep_companion() -> Int {
+    return 2;
+}

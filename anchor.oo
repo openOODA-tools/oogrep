@@ -1,0 +1,30 @@
+// # oogrep Anchor - Root Composition Surface
+//
+// Logline: Unified entry point re-exporting the search policy, pipeline, and integer admission pages.
+//
+// Setup: Re-exports the root composition surface. No domain logic lives on this page.
+//
+// Beats:
+//   1. Expose the shared search policy record and its defaults.
+//   2. Bind the single end to end search pipeline used by both surfaces.
+//   3. Offer integer admission to flag and argument parsers.
+
+import "parse_decimal.oo";
+import "search_opts.oo";
+import "search.oo";
+
+pub fn anchor_default_opts() -> SearchOpts {
+    return opts_defaults();
+}
+
+pub fn anchor_run(fs: &FsReadCap, o: SearchOpts) -> SearchOutcome {
+    return run_search(fs, o);
+}
+
+pub fn anchor_parse_decimal(raw: String, fallback: Int) -> Int {
+    return parse_decimal(raw, fallback);
+}
+
+pub fn anchor_probe() -> String {
+    return "oogrep-0.2.0";
+}

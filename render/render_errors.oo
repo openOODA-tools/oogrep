@@ -1,0 +1,59 @@
+// # Render Errors - Diagnostic And Usage Reporting
+//
+// Logline: Formats fatal diagnostics, usage errors, and the help text on the standard error channel.
+//
+// Setup: Pure string assembly. Every failure path in oogrep reports through this page.
+//
+// Beats:
+//   1. Format a named diagnostic with the tool prefix.
+//   2. Emit the usage block when arguments are missing or malformed.
+//   3. Emit the full flag reference for an explicit help request.
+
+fn prefix() -> String { return "oogrep: "; }
+
+pub fn render_error(msg: String) -> String {
+    return prefix() + msg + "\n";
+}
+
+pub fn render_usage_error(msg: String) -> String {
+    return render_error(msg) + "try 'oogrep --help' for usage\n";
+}
+
+pub fn render_help() -> String {
+    let mut s: String = "oogrep - capability-bounded recursive regex search\n";
+    s = s + "\n";
+    s = s + "usage: oogrep [flags] <pattern> [path]\n";
+    s = s + "use '-' as path to search standard input\n";
+    s = s + "\n";
+    s = s + "flags:\n";
+    s = s + "  -g, --glob <pattern>     include files matching glob\n";
+    s = s + "  -i, --ignore-case        case-insensitive matching\n";
+    s = s + "  -v, --invert-match       select non-matching lines\n";
+    s = s + "  -q, --quiet              suppress output, exit code only\n";
+    s = s + "  -m, --max-count <n>      stop after n matching lines per file\n";
+    s = s + "  -w, --word-regexp        match whole words only\n";
+    s = s + "  -A, --after-context <n>  print n lines after each match\n";
+    s = s + "  -B, --before-context <n> print n lines before each match\n";
+    s = s + "  -C, --context <n>        print n lines around each match\n";
+    s = s + "      --column             print the match column (default off)\n";
+    s = s + "      --json               emit one machine-readable JSON object\n";
+    s = s + "      --no-filename        suppress the path prefix\n";
+    s = s + "  -c, --count              print per-file match counts\n";
+    s = s + "  -l, --files-with-matches print only paths that matched\n";
+    s = s + "  -n, --line-number        print line numbers (default off)\n";
+    s = s + "  -H, --with-filename      always print the path prefix\n";
+    s = s + "      --no-line-number     suppress line numbers\n";
+    s = s + "      --no-color           disable ANSI color\n";
+    s = s + "      --max-depth <n>      limit traversal depth (default 32)\n";
+    s = s + "      --no-ignore          search ignored paths too (.gitignore off)\n";
+    s = s + "  -h, --help               display this help\n";
+    s = s + "  -V, --version            display version\n";
+    s = s + "      --mcp                run the MCP stdio server\n";
+    s = s + "\n";
+    s = s + "exit codes: 0 match found, 1 no match, 2 error\n";
+    return s;
+}
+
+pub fn render_version() -> String {
+    return "oogrep 0.2.0\n";
+}

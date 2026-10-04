@@ -1,0 +1,32 @@
+name: ci
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: oogrep
+
+      - name: Install openOODA toolchain
+        run: |
+          curl -fsSL https://openooda.org/install.sh -o /tmp/ooda-install.sh
+          OPENOODA_YES=1 bash /tmp/ooda-install.sh
+          echo "$HOME/.openooda/bin" >> "$GITHUB_PATH"
+
+      - name: Clone sibling std and oojq
+        working-directory: ${{ github.workspace }}
+        run: |
+          git clone --depth 1 https://github.com/openOODA/std std
+          git clone --depth 1 https://github.com/openOODA-tools/oojq oojq
+
+      - name: Build, verify, and test
+        working-directory: ${{ github.workspace }}/oogrep
+        run: |
+          export PATH="$HOME/.openooda/bin:$PATH"
+          make all

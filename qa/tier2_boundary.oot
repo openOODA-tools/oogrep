@@ -1,0 +1,34 @@
+# Tier 2: Boundary And Negative Trust Assertions
+File: oogrep/qa/tier2_boundary.oot
+
+Status: ACTIVE. Fail-closed validation. A single-sided happy-path suite is
+prohibited by the openOODA House Laws, so every boundary here asserts refusal
+or safe degradation rather than success.
+
+## Scope
+
+Malformed input, hostile input, and degenerate input. Each case must produce a
+named error or a bounded result. Silent success on bad input is a defect.
+
+## Assertions
+
+| ID | Invocation | Expectation |
+| --- | --- | --- |
+| T2-B01 | `oogrep` (no arguments) | usage error on stderr, exit 2 |
+| T2-B02 | `oogrep "([unclosed" qa/fixtures` | invalid pattern named, exit 2 |
+| T2-B03 | `oogrep "" qa/fixtures` | empty pattern rejected, exit 2 |
+| T2-B04 | `oogrep --glob` (no value) | missing value named, exit 2 |
+| T2-B05 | `oogrep --bogus-flag x` | unknown flag named, exit 2 |
+| T2-B06 | `oogrep "a" /nonexistent/path/xyz` | missing root named, exit 2 |
+| T2-B07 | `oogrep "a" a b c` (extra positionals) | every root searched, paths print |
+| T2-B08 | `oogrep --max-depth` (no value) | missing value named, exit 2 |
+| T2-B09 | `oogrep "a" qa/fixtures --max-matches 1` | truncation notice emitted |
+| T2-B10 | 0-byte candidate | admitted, contributes no lines, no crash |
+| T2-B11 | candidate containing NUL bytes | rejected as binary, no output |
+| T2-B12 | `--max-depth 0` on nested fixture | nested file not reached |
+| T2-B13 | `-v` over a file with blank lines | blanks selected, counted, exit 0 |
+
+## Invariant Under Test
+
+No malformed input may produce exit 0. A failed search that reports success is
+worse than a crash, because downstream pipelines cannot detect it.

@@ -1,0 +1,30 @@
+# Tier 3: Flag Combination Assertions
+File: oogrep/qa/tier3_combos.oot
+
+Status: ACTIVE. Verifies flags compose rather than override one another.
+
+## Scope
+
+Individual flags are covered in Tier 1. This tier asserts that combinations
+produce the intersection of their intents, and that mutually exclusive modes
+resolve deterministically.
+
+## Assertions
+
+| ID | Invocation | Expectation |
+| --- | --- | --- |
+| T3-C01 | `-c` with `-l` | counts win, no duplicate path records |
+| T3-C02 | `-i` with `-g "*.oo"` | case-folded search restricted to .oo |
+| T3-C03 | `-v` with `-c` | counts reflect non-matching lines |
+| T3-C04 | `--no-color` with `--no-line-number` | plain `path:text` records |
+| T3-C05 | `--no-ignore` with `-g "*.oot"` | walks ignored dirs too |
+| T3-C06 | `--max-depth 1` on fixtures root | nested fixture excluded |
+| T3-C07 | `--max-matches 1` with `-c` | counts stay complete, text clipped |
+| T3-C08 | pattern with metacharacters `[a-z]+` | class syntax honoured |
+| T3-C09 | pattern with alternation `a|b` | alternation honoured |
+| T3-C10 | pattern anchored `^pub` | only column-1 matches emitted |
+
+## Invariant Under Test
+
+The last flag wins within its own family, and independent families compose. A
+combination must never silently widen the result set beyond every flag's intent.

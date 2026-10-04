@@ -1,0 +1,26 @@
+# Build artifacts
+dist/
+*.deb
+*.rpm
+packaging/debian/files
+packaging/debian/*.log
+
+# Cache
+.ooda-cache/
+*.core
+
+# Local config overrides
+*.bak
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Runtime flight recorder artifacts
+.blackbox/

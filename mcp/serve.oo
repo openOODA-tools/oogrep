@@ -1,0 +1,90 @@
+// # MCP Serve - Standard IO Transport Loop
+//
+// Logline: Reads newline delimited JSON-RPC frames from stdin and writes one reply per frame to stdout.
+//
+// Setup: Requires FsReadCap for the stdin stream. Bounded reads keep the loop responsive to EOF.
+//
+// Beats:
+//   1. Drain every complete frame already buffered before issuing another read.
+//   2. Track initialize and shutdown so the session state advances per frame.
+//   3. Flush any trailing frame on EOF so a final unterminated request still answers.
+
+import "json_field.oo";
+import "dispatch.oo";
+
+pub type FrameState = struct {
+    reply: String,
+    initialized: Bool,
+    stop: Bool
+};
+
+fn index_of_nl_from(s: String, from: Int) -> Int {
+    let n: Int = chars_len(s);
+    let mut i: Int = from;
+    while i < n {
+        if char_at(s, i) == "\n" { return i; }
+        i = i + 1;
+    }
+    return -1;
+}
+
+fn strip_cr(s: String) -> String {
+    let n: Int = chars_len(s);
+    if n > 0 && char_at(s, n - 1) == "\r" {
+        return str_slice(s, 0, n - 1);
+    }
+    return s;
+}
+
+fn handle_frame(fs: &FsReadCap, line: String, initialized: Bool) -> FrameState {
+    if chars_len(str_trim(line)) == 0 {
+        return FrameState { reply: "", initialized: initialized, stop: false };
+    }
+    let method: String = json_field_string(line, "method");
+    let reply: String = mcp_dispatch(fs, line, initialized);
+    let mut next_init: Bool = initialized;
+    if method == "initialize" { next_init = true; }
+    let mut stop: Bool = false;
+    if method == "shutdown" { stop = true; }
+    if chars_len(reply) > 0 { println(reply); }
+    return FrameState { reply: reply, initialized: next_init, stop: stop };
+}
+
+pub fn mcp_serve(fs: &FsReadCap) -> Int {
+    let mut buf: String = "";
+    let mut initialized: Bool = false;
+    let mut running: Bool = true;
+
+    while running {
+        // A single read can deliver several frames at once, so drain the
+        // buffer completely before asking for more bytes. Otherwise a frame
+        // that arrived alongside its predecessor is lost at EOF.
+        let mut nl: Int = index_of_nl_from(buf, 0);
+        while nl >= 0 {
+            let line: String = strip_cr(str_slice(buf, 0, nl));
+            buf = str_slice(buf, nl + 1, chars_len(buf));
+            let st: FrameState = handle_frame(fs, line, initialized);
+            initialized = st.initialized;
+            if st.stop { running = false; }
+            nl = index_of_nl_from(buf, 0);
+        }
+        if !running { break; }
+
+        let cr: Result[String, String] = oo_read_stdin_chunk(fs, 200);
+        if cr.is_err() {
+            let e: String = match cr { Ok(_) => "", Err(m) => m };
+            if e != "timeout" {
+                if chars_len(str_trim(buf)) > 0 {
+                    let tail: FrameState = handle_frame(fs, buf, initialized);
+                    initialized = tail.initialized;
+                }
+                buf = "";
+                running = false;
+            }
+        } else {
+            let chunk: String = match cr { Ok(s) => s, Err(_) => "" };
+            buf = buf + chunk;
+        }
+    }
+    return 0;
+}

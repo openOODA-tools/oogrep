@@ -1,0 +1,114 @@
+// # JSON Field - Depth Aware Request Field Access
+//
+// Logline: Extracts top-level JSON fields by tracking brace depth so nested keys never shadow their parent.
+//
+// Setup: Pure. Provides the top-level field access the MCP transport needs.
+//
+// Beats:
+//   1. Skip string literals whole so braces inside them never alter depth.
+//   2. Locate a top-level key at depth one and return the offset of its value.
+//   3. Decode the value as a string, a balanced object, or a bare scalar.
+// std json_stream exposes a private parser and unresolvable byte offsets, so
+// this page supplies field access the stdlib does not publish.
+
+import "render/render_json.oo";
+
+fn skip_string(json: String, i: Int) -> Int {
+    let n: Int = chars_len(json);
+    let mut j: Int = i + 1;
+    while j < n {
+        let c: String = char_at(json, j);
+        if c == "\\" {
+            j = j + 2;
+        } else if c == "\"" {
+            return j + 1;
+        } else {
+            j = j + 1;
+        }
+    }
+    return n;
+}
+
+fn scan_balanced(json: String, start: Int) -> Int {
+    let n: Int = chars_len(json);
+    let mut depth: Int = 0;
+    let mut i: Int = start;
+    while i < n {
+        let c: String = char_at(json, i);
+        if c == "\"" {
+            i = skip_string(json, i);
+        } else {
+            if c == "{" || c == "[" { depth = depth + 1; }
+            else if c == "}" || c == "]" {
+                depth = depth - 1;
+                if depth == 0 { return i + 1; }
+            }
+            i = i + 1;
+        }
+    }
+    return n;
+}
+
+fn find_value_start(json: String, key: String) -> Int {
+    let n: Int = chars_len(json);
+    let mut depth: Int = 0;
+    let mut i: Int = 0;
+    while i < n {
+        let c: String = char_at(json, i);
+        if c == "\"" {
+            let after: Int = skip_string(json, i);
+            if depth == 1 {
+                let name: String = str_slice(json, i + 1, after - 1);
+                if name == key {
+                    let mut j: Int = after;
+                    while j < n {
+                        let w: String = char_at(json, j);
+                        if w == " " || w == "\t" || w == "\n" || w == "\r" { j = j + 1; } else { break; }
+                    }
+                    if j < n && char_at(json, j) == ":" { j = j + 1; }
+                    while j < n {
+                        let w2: String = char_at(json, j);
+                        if w2 == " " || w2 == "\t" || w2 == "\n" || w2 == "\r" { j = j + 1; } else { break; }
+                    }
+                    return j;
+                }
+            }
+            i = after;
+        } else {
+            if c == "{" || c == "[" { depth = depth + 1; }
+            else if c == "}" || c == "]" { depth = depth - 1; }
+            i = i + 1;
+        }
+    }
+    return -1;
+}
+
+pub fn json_field_raw(json: String, key: String) -> String {
+    let start: Int = find_value_start(json, key);
+    if start < 0 { return ""; }
+    let n: Int = chars_len(json);
+    if char_at(json, start) == "\"" {
+        return str_slice(json, start, skip_string(json, start));
+    }
+    if char_at(json, start) == "{" || char_at(json, start) == "[" {
+        return str_slice(json, start, scan_balanced(json, start));
+    }
+    let mut j: Int = start;
+    while j < n {
+        let c: String = char_at(json, j);
+        if c == "," || c == "}" || c == "]" || c == " " || c == "\t" || c == "\n" || c == "\r" { break; }
+        j = j + 1;
+    }
+    return str_slice(json, start, j);
+}
+
+pub fn json_field_string(json: String, key: String) -> String {
+    let start: Int = find_value_start(json, key);
+    if start < 0 { return ""; }
+    let end: Int = skip_string(json, start);
+    return str_slice(json, start + 1, end - 1);
+}
+
+pub fn json_escape(s: String) -> String {
+    return json_escape_text(s);
+}

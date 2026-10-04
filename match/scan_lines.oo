@@ -1,0 +1,193 @@
+// # Scan Lines - File To Hit Record Conversion
+//
+// Logline: Reads a candidate file once and converts matching lines into ordered Hit records.
+//
+// Setup: Requires FsReadCap. Rejects binary content so downstream pipelines stay clean.
+//
+// Beats:
+//   1. Read the file and reject it when the content carries NUL bytes.
+//   2. Walk the content line by line, testing each against the pattern, word policy, and match cap.
+//   3. Emit one Hit per selected line, ascending, honouring invert selection.
+
+import "std/fs/os/fs.oo";
+import "std/core/text/regex.oo";
+import "std/core/text/regex_nfa.oo";
+import "search_opts.oo";
+import "locate_span.oo";
+
+pub type Hit = struct {
+    path: String,
+    line_no: Int,
+    line_text: String,
+    col: Int,
+    match_len: Int,
+    context: Bool
+};
+
+// A "\0" literal compiles to an empty string, and oo_str_index_of returns 0
+// for an empty needle, so every file would read as binary. The NUL byte is
+// built explicitly, the same way the ANSI escape byte is.
+fn nul_byte() -> String {
+    return bytes_to_str(bytes_push(bytes_new(), 0));
+}
+
+fn is_binary(body: String) -> Bool {
+    return str_index_of(body, nul_byte()) >= 0;
+}
+
+pub fn scan_is_binary(body: String) -> Bool {
+    return is_binary(body);
+}
+
+fn strip_cr(line: String) -> String {
+    let n: Int = chars_len(line);
+    if n > 0 && char_at(line, n - 1) == "\r" {
+        return str_slice(line, 0, n - 1);
+    }
+    return line;
+}
+
+pub fn split_lines(body: String) -> List[String] {
+    // One native split: line breaking stays linear no matter how long the
+    // file gets. A trailing newline is a terminator, not an extra empty
+    // line: grep numbers real lines only, so a phantom final segment is
+    // dropped and a last-line match ends at the real last line.
+    let raw: List[String] = str_split(body, "\n");
+    let mut out: List[String] = list_new();
+    let n: Int = list_len(raw);
+    let mut i: Int = 0;
+    while i < n {
+        let is_last: Bool = i == (n - 1);
+        let seg: String = list_get(raw, i);
+        let trailing_empty: Bool = is_last && chars_len(seg) == 0 && chars_len(body) > 0;
+        if !trailing_empty {
+            out = list_push(out, strip_cr(seg));
+        }
+        i = i + 1;
+    }
+    return out;
+}
+
+fn is_word_char(c: String) -> Bool {
+    return char_is_alpha(c) || char_is_digit(c) || c == "_";
+}
+
+fn word_core(pattern: String) -> String {
+    let mut s: String = pattern;
+    if chars_len(s) > 0 && char_at(s, 0) == "^" { s = str_slice(s, 1, chars_len(s)); }
+    let n: Int = chars_len(s);
+    if n > 0 && char_at(s, n - 1) == "$" { s = str_slice(s, 0, n - 1); }
+    return s;
+}
+
+fn word_anchored_start(pattern: String) -> Bool {
+    return chars_len(pattern) > 0 && char_at(pattern, 0) == "^";
+}
+
+fn word_anchored_end(pattern: String) -> Bool {
+    let n: Int = chars_len(pattern);
+    return n > 0 && char_at(pattern, n - 1) == "$";
+}
+
+// A token matches when one top-level alternative matches it end to end. The
+// engine reports no usable spans (an unanchored probe always spans the whole
+// input), so each alternative is wrapped in ^...$ and the wrap is what makes
+// the full-token test honest. Splitting on | must skip class bodies.
+fn word_alt_matches(core: String, token: String, ignore_case: Bool) -> Bool {
+    let n: Int = chars_len(core);
+    let mut seg_start: Int = 0;
+    let mut k: Int = 0;
+    let mut in_class: Bool = false;
+    while k <= n {
+        let c: String = if k < n { char_at(core, k) } else { "|" };
+        if c == "[" {
+            in_class = true;
+        } else if c == "]" {
+            in_class = false;
+        } else if c == "|" && !in_class {
+            let wrapped: String = "^" + str_slice(core, seg_start, k) + "$";
+            let hit: Bool = if ignore_case { nfa_simulate_ci(wrapped, token) } else { nfa_simulate(wrapped, token) };
+            if hit { return true; }
+            seg_start = k + 1;
+        }
+        k = k + 1;
+    }
+    return false;
+}
+
+fn line_word_match(pattern: String, line: String, ignore_case: Bool) -> Bool {
+    // A literal pattern without anchors can never match a token partially, so
+    // plain equality replaces the engine probe. Literals carry no ^ or $ by
+    // construction, which is what makes the position check unnecessary here.
+    let fast: Bool = !ignore_case && span_is_literal(pattern);
+    let core: String = word_core(pattern);
+    let anch_s: Bool = word_anchored_start(pattern);
+    let anch_e: Bool = word_anchored_end(pattern);
+    let n: Int = chars_len(line);
+    let mut i: Int = 0;
+    while i < n {
+        while i < n && !is_word_char(char_at(line, i)) { i = i + 1; }
+        let mut j: Int = i;
+        while j < n && is_word_char(char_at(line, j)) { j = j + 1; }
+        if j > i {
+            let tok: String = str_slice(line, i, j);
+            if fast {
+                if tok == pattern { return true; }
+            } else {
+                let pos_ok: Bool = (!anch_s || i == 0) && (!anch_e || j == n);
+                if pos_ok && word_alt_matches(core, tok, ignore_case) { return true; }
+            }
+        }
+        i = j;
+    }
+    return false;
+}
+
+pub fn select_line(re: Regex, o: SearchOpts, line: String) -> Bool {
+    // An empty line can still match (a star-height pattern) or be selected
+    // by inversion, so it runs the same test instead of a blanket refusal.
+    if chars_len(line) == 0 && o.whole_word { return o.invert; }
+    if chars_len(line) == 0 { return regex_is_match(re, line) != o.invert; }
+    // A plain case-sensitive literal skips the engine for an exact substring
+    // probe. Every other shape keeps the engine so semantics never change.
+    let mut matched: Bool = false;
+    if o.whole_word {
+        matched = line_word_match(o.pattern, line, o.ignore_case);
+    } else if !o.ignore_case && span_is_literal(o.pattern) {
+        matched = str_contains(line, o.pattern);
+    } else {
+        matched = regex_is_match(re, line);
+    }
+    return matched != o.invert;
+}
+
+pub fn scan_text(path: String, body: String, re: Regex, o: SearchOpts) -> List[Hit] {
+    let mut hits: List[Hit] = list_new();
+    if is_binary(body) { return hits; }
+    let lines: List[String] = split_lines(body);
+    let total: Int = list_len(lines);
+    let mut kept: Int = 0;
+    let mut i: Int = 0;
+    while i < total {
+        let line: String = list_get(lines, i);
+        if select_line(re, o, line) {
+            if o.max_count <= 0 || kept < o.max_count {
+                let sp: LineSpan = locate_span(re, line, o.pattern, o.ignore_case);
+                hits = list_push(hits, Hit { path: path, line_no: i + 1, line_text: line, col: sp.col, match_len: sp.len, context: false });
+                kept = kept + 1;
+            }
+        }
+        i = i + 1;
+    }
+    return hits;
+}
+
+pub fn scan_lines(fs: &FsReadCap, path: String, re: Regex, o: SearchOpts) -> List[Hit] {
+    let r: Result[String, String] = fs_read_file(fs, path);
+    if r.is_err() {
+        let none: List[Hit] = list_new();
+        return none;
+    }
+    let body: String = match r { Ok(s) => s, Err(_) => "" };
+    return scan_text(path, body, re, o);
+}

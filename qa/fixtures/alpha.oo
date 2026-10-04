@@ -1,0 +1,18 @@
+// # QA Fixture Alpha - Secondary Search Target
+//
+// Logline: Fixture page carrying extra pub fn markers for count and files-only assertions.
+//
+// Setup: Pure page. Never linked into the binary; it exists as searchable test data.
+//
+// Beats:
+//   1. Declare two functions so per-file counts exceed one.
+//   2. Keep the page free of the main marker so files-only can discriminate.
+//   3. Remain a valid page so make check typechecks it.
+
+pub fn alpha_helper() -> Int {
+    return 1;
+}
+
+pub fn alpha_second() -> Int {
+    return 2;
+}

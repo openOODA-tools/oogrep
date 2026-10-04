@@ -1,0 +1,104 @@
+// # Collect Candidates - Pruning Recursive Tree Walker
+//
+// Logline: Recursively gathers searchable file paths while pruning ignored directories and bounding depth.
+//
+// Setup: Requires FsReadCap for every directory read. Honours the caller depth budget and ignore policy.
+//
+// Beats:
+//   1. Admit a file root directly and return it as the sole candidate.
+//   2. Walk directories recursively, pruning ignored names and stopping at the depth bound.
+//   3. Return candidate paths in deterministic traversal order.
+
+import "std/fs/os/fs.oo";
+import "gitignore.oo";
+
+pub type Admitted = struct {
+    paths: List[String],
+    skipped: Int
+};
+
+fn is_ignored_dir(name: String) -> Bool {
+    return name == ".git" || name == "target" || name == "dist" || name == "node_modules" || name == ".ooda-cache" || name == ".venv" || name == "__pycache__" || name == ".cache";
+}
+
+fn join_path(base: String, name: String) -> String {
+    if chars_len(base) == 0 { return name; }
+    if str_ends_with(base, "/") { return base + name; }
+    return base + "/" + name;
+}
+
+// Each frame accumulates into its own local list and merges child results back,
+// mirroring std fs_walk. Threading one accumulator through the recursion copies
+// the whole list per level and faults on large trees.
+fn append_all(acc: List[String], more: List[String]) -> List[String] {
+    let mut out: List[String] = acc;
+    let n: Int = list_len(more);
+    let mut i: Int = 0;
+    while i < n {
+        out = list_push(out, list_get(more, i));
+        i = i + 1;
+    }
+    return out;
+}
+
+fn append_rules(acc: List[IgnoreRule], more: List[IgnoreRule]) -> List[IgnoreRule] {
+    let mut out: List[IgnoreRule] = acc;
+    let n: Int = list_len(more);
+    let mut i: Int = 0;
+    while i < n {
+        out = list_push(out, list_get(more, i));
+        i = i + 1;
+    }
+    return out;
+}
+
+fn walk_recursive(fs: &FsReadCap, dir: String, depth: Int, max_depth: Int, respect_ignore: Bool, rules: List[IgnoreRule]) -> Admitted {
+    let empty_paths: List[String] = list_new();
+    let mut out: List[String] = empty_paths;
+    let mut skipped: Int = 0;
+    if depth > max_depth { return Admitted { paths: out, skipped: skipped }; }
+    let local: List[IgnoreRule] = if respect_ignore { append_rules(rules, load_gitignore(fs, dir)) } else { rules };
+    let entries: List[String] = fs_read_dir(fs, dir);
+    let n: Int = list_len(entries);
+    let mut i: Int = 0;
+    while i < n {
+        let name: String = list_get(entries, i);
+        if name != "." && name != ".." && chars_len(name) > 0 {
+            let sub: String = join_path(dir, name);
+            if fs_is_dir(fs, sub) {
+                if respect_ignore && (is_ignored_dir(name) || ignore_hit(local, sub, true)) {
+                    skipped = skipped + 1;
+                } else {
+                    let child: Admitted = walk_recursive(fs, sub, depth + 1, max_depth, respect_ignore, local);
+                    out = append_all(out, child.paths);
+                    skipped = skipped + child.skipped;
+                }
+            } else {
+                if respect_ignore && ignore_hit(local, sub, false) {
+                    skipped = skipped + 1;
+                } else {
+                    out = list_push(out, sub);
+                }
+            }
+        }
+        i = i + 1;
+    }
+    return Admitted { paths: out, skipped: skipped };
+}
+
+pub fn collect_candidates(fs: &FsReadCap, root: String, max_depth: Int, respect_ignore: Bool) -> Admitted {
+    let none: List[String] = list_new();
+    let no_rules: List[IgnoreRule] = list_new();
+    if !fs_path_exists(fs, root) { return Admitted { paths: none, skipped: 0 }; }
+    if !fs_is_dir(fs, root) {
+        // An explicitly named file is always admitted, even when ignore
+        // rules would prune it during a walk. Naming a file is intent.
+        let single: List[String] = list_new();
+        return Admitted { paths: list_push(single, root), skipped: 0 };
+    }
+    return walk_recursive(fs, root, 0, max_depth, respect_ignore, no_rules);
+}
+
+pub fn collect_ignores() -> String {
+    return ".git,target,dist,node_modules,.ooda-cache,.venv,__pycache__,.cache";
+}

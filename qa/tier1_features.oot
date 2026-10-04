@@ -1,0 +1,49 @@
+# Tier 1: Core Feature Assertions
+File: oogrep/qa/tier1_features.oot
+
+Status: ACTIVE. Executed by `make test` against the built binary.
+
+## Scope
+
+Happy-path coverage for every documented output mode and flag. Each assertion
+names the exact invocation and the expected observable. Tier 1 proves the tool
+does what the README claims on well formed input.
+
+## Assertions
+
+| ID | Invocation | Expectation |
+| --- | --- | --- |
+| T1-F01 | `oogrep --help` | prints usage block, exit 0 |
+| T1-F02 | `oogrep --version` | prints version banner, exit 0 |
+| T1-F03 | `oogrep "pub fn main" qa/fixtures` | exit 0, names `main.oo` |
+| T1-F04 | `oogrep "zzz_no_such_token_zzz" qa/fixtures` | exit 1, no output |
+| T1-F05 | `oogrep -c "pub fn" qa/fixtures` | one `path:count` record per file |
+| T1-F06 | `oogrep -l "pub fn main" qa/fixtures` | bare path list, no line detail |
+| T1-F07 | `oogrep -g "*.oot" "oogrep" qa/fixtures` | matches `beta.oot` only |
+| T1-F08 | `oogrep -v "pub fn" qa/fixtures` | exit 0, non-matching lines only |
+| T1-F09 | `oogrep -i "PUB FN MAIN" qa/fixtures` | exit 0 via case folding |
+| T1-F10 | `oogrep -n "pub fn main" qa/fixtures/main.oo` | `12:pub fn main`, numbers on demand |
+| T1-F11 | `oogrep "pub fn main" qa/fixtures/main.oo` | file root accepted directly |
+| T1-F12 | `oogrep "pub fn" qa/fixtures --no-color` | no ANSI escape bytes |
+| T1-F13 | `printf 'apple pie' \| oogrep "apple" -` | exit 0, bare `apple pie` |
+| T1-F14 | `printf 'apple pie' \| oogrep "zebra" -` | exit 1, no output |
+| T1-F15 | `oogrep -q "pub fn main" qa/fixtures` | exit 0, zero output bytes |
+| T1-F16 | `oogrep -m 1 "pub fn" qa/fixtures/main.oo` | one line only, the first hit |
+| T1-F17 | `oogrep -w "ub" qa/fixtures` | exit 1, partial word rejected |
+| T1-F18 | `oogrep -n -A 1 "alpha_second" qa/fixtures/alpha.oo` | match plus `17-    return 2;` line |
+| T1-F19 | `oogrep -n -B 1 "alpha_second" qa/fixtures/alpha.oo` | `15-` line plus match |
+| T1-F20 | `oogrep -A 1 "return" qa/fixtures/alpha.oo` | `--` separates the two groups |
+| T1-F21 | `oogrep "pub fn main" qa/fixtures/main.oo` | bare `pub fn main...`, no path, no numbers |
+| T1-F22 | `oogrep -n --column "pub fn main" qa/fixtures/main.oo` | `12:1:pub fn main` |
+| T1-F23 | `printf 'a\nb\n' \| oogrep -A 1 "b" -` | one line only, no phantom line 3 |
+| T1-F24 | `oogrep -n --no-filename "pub fn main" qa/fixtures` | `12:pub fn main`, no path |
+| T1-F25 | `oogrep --no-filename --no-line-number "pub fn main" qa/fixtures` | bare matched text only |
+| T1-F26 | `oogrep -n "pub fn main" qa/fixtures/main.oo qa/fixtures/alpha.oo` | paths print for two inputs |
+| T1-F27 | `oogrep -n -H "pub fn main" qa/fixtures/main.oo` | path forced onto one input |
+| T1-F28 | `oogrep "x" /nonexistent-oogrep-xyz` | exit 2, missing root reported |
+| T1-F29 | `oogrep -c "pub fn main" qa/fixtures` | zero files listed as `path:0` |
+
+## Determinism
+
+Every assertion is executed twice in a fresh process by the `make test`
+double-run probe. Run_1 must equal Run_2 byte for byte.

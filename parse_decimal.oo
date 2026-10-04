@@ -1,0 +1,50 @@
+// # Parse Decimal - Decimal Integer Admission
+//
+// Logline: Parses a decimal integer from raw text, returning a fallback when no digits are present.
+//
+// Setup: Pure. Shared by the CLI flag parser and the MCP argument decoder.
+//
+// Beats:
+//   1. Accept an optional leading minus sign.
+//   2. Accumulate decimal digits, ignoring any non-digit character.
+//   3. Return the fallback when the input carries no digit at all.
+// Named parse_decimal to stay clear of the runtime parse_int builtin, which
+// collides at arity one and refuses this page's two-argument form.
+
+fn digit_of(c: String) -> Int {
+    if c == "0" { return 0; }
+    if c == "1" { return 1; }
+    if c == "2" { return 2; }
+    if c == "3" { return 3; }
+    if c == "4" { return 4; }
+    if c == "5" { return 5; }
+    if c == "6" { return 6; }
+    if c == "7" { return 7; }
+    if c == "8" { return 8; }
+    if c == "9" { return 9; }
+    return -1;
+}
+
+pub fn parse_decimal(raw: String, fallback: Int) -> Int {
+    let n: Int = chars_len(raw);
+    if n == 0 { return fallback; }
+    let mut i: Int = 0;
+    let mut neg: Bool = false;
+    if char_at(raw, 0) == "-" {
+        neg = true;
+        i = 1;
+    }
+    let mut res: Int = 0;
+    let mut any: Bool = false;
+    while i < n {
+        let d: Int = digit_of(char_at(raw, i));
+        if d >= 0 {
+            res = res * 10 + d;
+            any = true;
+        }
+        i = i + 1;
+    }
+    if !any { return fallback; }
+    if neg { return 0 - res; }
+    return res;
+}

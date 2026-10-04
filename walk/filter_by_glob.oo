@@ -1,0 +1,44 @@
+// # Filter By Glob - Include Pattern Admission
+//
+// Logline: Admits candidate paths whose basename or full path matches a caller supplied glob.
+//
+// Setup: Pure. Consumes a candidate list and a glob pattern, returns the admitted subset.
+//
+// Beats:
+//   1. Pass every candidate through unchanged when no pattern is supplied.
+//   2. Test the basename first, then the full path, against the glob.
+//   3. Return the admitted subset preserving traversal order.
+
+import "std/fs/file/glob.oo";
+
+fn basename_of(path: String) -> String {
+    let n: Int = chars_len(path);
+    let mut i: Int = n - 1;
+    while i >= 0 {
+        if char_at(path, i) == "/" {
+            return str_slice(path, i + 1, n);
+        }
+        i = i - 1;
+    }
+    return path;
+}
+
+pub fn filter_by_glob(candidates: List[String], pattern: String) -> List[String] {
+    let pat: String = str_trim(pattern);
+    if chars_len(pat) == 0 { return candidates; }
+    let mut out: List[String] = list_new();
+    let n: Int = list_len(candidates);
+    let mut i: Int = 0;
+    while i < n {
+        let p: String = list_get(candidates, i);
+        if glob_matches(pat, basename_of(p)) || glob_matches(pat, p) {
+            out = list_push(out, p);
+        }
+        i = i + 1;
+    }
+    return out;
+}
+
+pub fn glob_basenames(pattern: String) -> String {
+    return basename_of(pattern);
+}

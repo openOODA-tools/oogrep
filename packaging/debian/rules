@@ -1,0 +1,9 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+override_dh_auto_install:
+	dh_auto_install
+	install -d debian/oogrep/usr/bin
+	install -m 0755 ../dist/oogrep-linux-x86_64 debian/oogrep/usr/bin/oogrep

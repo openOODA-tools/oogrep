@@ -1,0 +1,78 @@
+// # Locate Span - First Match Position In Line
+//
+// Logline: Reports the one-based column and width of a match, locating literals directly.
+//
+// Setup: Pure. Consumes a compiled regex, one line, and the original pattern text.
+//
+// Beats:
+//   1. Reject a span the engine cannot describe honestly.
+//   2. Locate a metacharacter-free pattern by exact scan, folding ASCII case when asked, giving exact columns.
+//   3. Decline a column for true regex patterns rather than report a wrong one.
+//
+// RegexSpan is not trustworthy here: start_idx always reads zero and
+// matched_text yields only the final character of the match. Selection still
+// uses regex_is_match, which is correct, so a wrong column is never needed for
+// correctness. A literal scan is exact, and a general regex declines the column
+// instead of lying about it.
+
+import "std/core/text/regex.oo";
+import "std/core/text/case_converter.oo";
+
+pub type LineSpan = struct {
+    col: Int,
+    len: Int
+};
+
+fn max_literal_scan() -> Int { return 1024; }
+
+fn is_meta(c: String) -> Bool {
+    return c == "." || c == "*" || c == "+" || c == "?" || c == "[" || c == "]" || c == "(" || c == ")" || c == "{" || c == "}" || c == "|" || c == "^" || c == "$" || c == "\\";
+}
+
+fn is_literal(pattern: String) -> Bool {
+    let n: Int = chars_len(pattern);
+    if n == 0 { return false; }
+    let mut i: Int = 0;
+    while i < n {
+        if is_meta(char_at(pattern, i)) { return false; }
+        i = i + 1;
+    }
+    return true;
+}
+
+fn str_eq_fold(a: String, b: String) -> Bool {
+    let n: Int = chars_len(a);
+    if n != chars_len(b) { return false; }
+    let mut i: Int = 0;
+    while i < n {
+        if char_to_lower(char_at(a, i)) != char_to_lower(char_at(b, i)) { return false; }
+        i = i + 1;
+    }
+    return true;
+}
+
+pub fn span_is_literal(pattern: String) -> Bool {
+    return is_literal(pattern);
+}
+
+pub fn locate_span(re: Regex, line: String, pattern: String, ignore_case: Bool) -> LineSpan {
+    if !regex_is_match(re, line) { return LineSpan { col: 0, len: 0 }; }
+    if !is_literal(pattern) { return LineSpan { col: 0, len: 0 }; }
+
+    let plen: Int = chars_len(pattern);
+    let n: Int = chars_len(line);
+    if plen > n { return LineSpan { col: 0, len: 0 }; }
+    if n > max_literal_scan() { return LineSpan { col: 0, len: 0 }; }
+
+    let last: Int = n - plen;
+    let mut k: Int = 0;
+    while k <= last {
+        let cand: String = str_slice(line, k, k + plen);
+        let hit: Bool = if ignore_case { str_eq_fold(cand, pattern) } else { cand == pattern };
+        if hit {
+            return LineSpan { col: k + 1, len: plen };
+        }
+        k = k + 1;
+    }
+    return LineSpan { col: 0, len: 0 };
+}

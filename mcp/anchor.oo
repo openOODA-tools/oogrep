@@ -1,0 +1,43 @@
+// # MCP Subsystem Anchor - Agent Transport
+//
+// Logline: Unified entry point for the MCP stdio transport, schema emission, and tool dispatch.
+//
+// Setup: Re-exports the mcp domain. The transport owns no search logic; it delegates to run_search.
+//
+// Beats:
+//   1. Expose the stdio serve loop to the entry point.
+//   2. Bind request dispatch and protocol schema emission.
+//   3. Offer the field accessors the transport needs for frame parsing.
+
+import "json_field.oo";
+import "schema.oo";
+import "dispatch.oo";
+import "serve.oo";
+
+pub fn mcp_run(fs: &FsReadCap) -> Int {
+    return mcp_serve(fs);
+}
+
+pub fn mcp_route(fs: &FsReadCap, req: String, initialized: Bool) -> String {
+    return mcp_dispatch(fs, req, initialized);
+}
+
+pub fn mcp_tools_list(id: String) -> String {
+    return build_tools_list(id);
+}
+
+pub fn mcp_initialize(id: String) -> String {
+    return build_initialize(id);
+}
+
+pub fn mcp_error(id: String, code: Int, msg: String) -> String {
+    return build_error(id, code, msg);
+}
+
+pub fn mcp_field_string(json: String, key: String) -> String {
+    return json_field_string(json, key);
+}
+
+pub fn mcp_anchor_probe() -> String {
+    return schema_protocol_version();
+}

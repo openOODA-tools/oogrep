@@ -1,0 +1,16 @@
+# QA Fixture Beta - Glob Filter Target
+File: oogrep/qa/fixtures/beta.oot
+
+Status: FIXTURE. This document exists only as searchable test data for the oogrep
+test suite. It is never compiled and never linked into the binary.
+
+The oogrep glob assertion searches this directory for the token oogrep while
+restricting candidates to the *.oot glob. This line is the only match, so the
+assertion can prove the glob filter admitted this file and rejected the .oo
+fixtures sitting beside it.
+
+## Purpose
+
+Provide a non-openOODA-extension target so the include glob has something to
+discriminate on. A search that ignores the glob would match the sibling fixture
+pages as well and the count assertion would fail.

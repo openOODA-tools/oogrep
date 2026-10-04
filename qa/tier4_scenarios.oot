@@ -1,0 +1,35 @@
+# Tier 4: Agent Surface And Scenario Assertions
+File: oogrep/qa/tier4_scenarios.oot
+
+Status: ACTIVE. Covers the MCP stdio transport and end-to-end agent scenarios.
+
+## MCP Protocol Assertions
+
+Transport is newline delimited JSON-RPC over stdin/stdout. No socket, no port,
+no daemon.
+
+| ID | Frame | Expectation |
+| --- | --- | --- |
+| T4-P01 | `initialize` | result carries protocolVersion 2024-11-05 |
+| T4-P02 | `tools/list` before initialize | JSON-RPC error -32600 |
+| T4-P03 | `tools/list` after initialize | declares the `search` tool |
+| T4-P04 | `tools/call` name=`search` | result carries content and telemetry |
+| T4-P05 | `tools/call` missing pattern | error -32602, never empty success |
+| T4-P06 | `tools/call` unknown tool | error -32601 |
+| T4-P07 | unknown method | error -32601 |
+| T4-P08 | `shutdown` | acknowledged, loop exits at EOF |
+
+## Agent Context Assertions
+
+| ID | Invocation | Expectation |
+| --- | --- | --- |
+| T4-A01 | `search` with `max_chars` omitted | output capped at 4000 chars |
+| T4-A02 | `search` with `max_chars` = 999999 | clamped to 65536 |
+| T4-A03 | large result set | `truncated` flag reports honestly |
+| T4-A04 | `search` over nonexistent path | error -32602 names the missing path |
+| T4-A05 | result text with embedded quotes | escaped, stays valid JSON |
+
+## Invariant Under Test
+
+An agent receives bounded, parseable, honest output. A truncated result must
+declare its own truncation rather than present a partial answer as complete.

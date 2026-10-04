@@ -1,0 +1,71 @@
+// # Search Options - Caller Policy Record
+//
+// Logline: Owns the resolved search policy record and its default construction for every entry point.
+//
+// Setup: Pure. Both the CLI and the MCP transport build a SearchOpts and nothing else.
+//
+// Beats:
+//   1. Declare the policy fields that govern traversal, matching, and output.
+//   2. Construct the default policy used when no flags are supplied.
+//   3. Expose the shared default depth and budget constants.
+
+import "render/render_errors.oo";
+
+pub type SearchOpts = struct {
+    pattern: String,
+    roots: List[String],
+    glob: String,
+    ignore_case: Bool,
+    invert: Bool,
+    count_mode: Bool,
+    files_only: Bool,
+    show_lines: Bool,
+    color: Bool,
+    max_depth: Int,
+    respect_ignore: Bool,
+    budget: Int,
+    quiet: Bool,
+    max_count: Int,
+    whole_word: Bool,
+    ctx_before: Int,
+    ctx_after: Int,
+    show_column: Bool,
+    show_filename: Bool,
+    filename_auto: Bool,
+    json_mode: Bool
+};
+
+pub fn default_depth() -> Int { return 32; }
+
+pub fn default_budget() -> Int { return 0; }
+
+pub fn opts_defaults() -> SearchOpts {
+    let single: List[String] = list_new();
+    return SearchOpts {
+        pattern: "",
+        roots: list_push(single, "."),
+        glob: "",
+        ignore_case: false,
+        invert: false,
+        count_mode: false,
+        files_only: false,
+        show_lines: false,
+        color: true,
+        max_depth: default_depth(),
+        respect_ignore: true,
+        budget: default_budget(),
+        quiet: false,
+        max_count: 0,
+        whole_word: false,
+        ctx_before: 0,
+        ctx_after: 0,
+        show_column: false,
+        show_filename: true,
+        filename_auto: true,
+        json_mode: false
+    };
+}
+
+pub fn opts_version() -> String {
+    return str_trim(render_version());
+}

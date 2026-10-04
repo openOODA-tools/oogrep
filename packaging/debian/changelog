@@ -1,0 +1,5 @@
+oogrep (0.2.0-1) stable; urgency=low
+
+  * JSON output, .gitignore-aware search, MCP skipped telemetry.
+
+ -- openOODA-tools <ops@openooda.org>  Sun, 04 Oct 2026 00:00:00 +0000

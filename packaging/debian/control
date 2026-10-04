@@ -1,0 +1,13 @@
+Source: oogrep
+Section: utils
+Priority: optional
+Maintainer: openOODA-tools <ops@openooda.org>
+Standards-Version: 4.6.2
+Build-Depends: debhelper-compat (= 13)
+
+Package: oogrep
+Architecture: amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Capability-bounded recursive regex search
+ A drop-in grep replacement written in openOODA, with machine-readable
+ JSON output and a first-class MCP surface for agent callers.

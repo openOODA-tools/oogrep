@@ -1,0 +1,51 @@
+// # MCP Schema - Initialization And Tool Catalogue
+//
+// Logline: Emits the JSON-RPC results for initialize and tools/list describing the search tool.
+//
+// Setup: Pure string assembly. The catalogue is static and version pinned to protocol 2024-11-05.
+//
+// Beats:
+//   1. Emit the initialize result carrying protocol version and server identity.
+//   2. Emit the tools/list result declaring the search tool and every argument it accepts.
+//   3. Emit a structured JSON-RPC error envelope for unknown or malformed calls.
+
+import "json_field.oo";
+
+fn protocol_version() -> String { return "2024-11-05"; }
+
+pub fn build_initialize(id: String) -> String {
+    let inner: String = "{\"protocolVersion\":\"" + protocol_version() + "\",\"capabilities\":{\"tools\":{}},\"serverInfo\":{\"name\":\"oogrep\",\"version\":\"0.2.0\"}}";
+    return "{\"jsonrpc\":\"2.0\",\"id\":" + id + ",\"result\":" + inner + "}";
+}
+
+fn search_tool_schema() -> String {
+    let s: String = "{\"name\":\"search\",\"description\":\"Recursive regex search over a filesystem subtree under this process read capability.\",";
+    let t: String = "\"inputSchema\":{\"type\":\"object\",\"properties\":{";
+    let p1: String = "\"pattern\":{\"type\":\"string\",\"description\":\"Regex to match. Required.\"},";
+    let p2: String = "\"path\":{\"type\":\"string\",\"description\":\"Root directory or file. Defaults to the current directory.\"},";
+    let p3: String = "\"glob\":{\"type\":\"string\",\"description\":\"Include glob such as *.oo. Empty admits every candidate.\"},";
+    let p4: String = "\"ignore_case\":{\"type\":\"boolean\",\"description\":\"Case-insensitive matching. Defaults to false.\"},";
+    let p5: String = "\"invert\":{\"type\":\"boolean\",\"description\":\"Select non-matching lines. Defaults to false.\"},";
+    let p6: String = "\"max_depth\":{\"type\":\"integer\",\"description\":\"Traversal depth bound. Defaults to 32.\"},";
+    let p7: String = "\"max_chars\":{\"type\":\"integer\",\"description\":\"Agent context cap. Defaults to 4000, clamped to 65536.\"},";
+    let p8: String = "\"whole_word\":{\"type\":\"boolean\",\"description\":\"Match whole words only. Defaults to false.\"},";
+    let p9: String = "\"max_matches\":{\"type\":\"integer\",\"description\":\"Stop after this many matching lines per file. 0 means no cap.\"},";
+    let p10: String = "\"context_before\":{\"type\":\"integer\",\"description\":\"Print this many lines before each match. Defaults to 0.\"},";
+    let p11: String = "\"context_after\":{\"type\":\"integer\",\"description\":\"Print this many lines after each match. Defaults to 0.\"}";
+    let tail: String = "},\"required\":[\"pattern\"]}}";
+    return s + t + p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9 + p10 + p11 + tail;
+}
+
+pub fn build_tools_list(id: String) -> String {
+    let inner: String = "{\"tools\":[" + search_tool_schema() + "]}";
+    return "{\"jsonrpc\":\"2.0\",\"id\":" + id + ",\"result\":" + inner + "}";
+}
+
+pub fn build_error(id: String, code: Int, msg: String) -> String {
+    let inner: String = "{\"code\":" + code.to_string() + ",\"message\":\"" + json_escape(msg) + "\"}";
+    return "{\"jsonrpc\":\"2.0\",\"id\":" + id + ",\"error\":" + inner + "}";
+}
+
+pub fn schema_protocol_version() -> String {
+    return protocol_version();
+}

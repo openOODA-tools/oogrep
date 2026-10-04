@@ -1,0 +1,39 @@
+// # Render Summary - Tally And Path List Rendering
+//
+// Logline: Renders per-file match counts and matched-path lists for the summary output modes.
+//
+// Setup: Pure. Consumes a ranked tally list and the active output mode. Never reads the filesystem.
+//
+// Beats:
+//   1. Render one path and count record per file when counts are requested.
+//   2. Render one bare path per matched file when only paths are requested.
+//   3. Report the clipped hit count when the emission budget truncated the result.
+
+import "match/rank_hits.oo";
+
+pub fn render_tallies(tallies: List[FileTally], with_counts: Bool, show_filename: Bool) -> String {
+    let mut out: String = "";
+    let n: Int = list_len(tallies);
+    let mut i: Int = 0;
+    while i < n {
+        let t: FileTally = list_get(tallies, i);
+        if with_counts {
+            if show_filename {
+                out = out + t.path + ":" + t.count.to_string() + "\n";
+            } else {
+                out = out + t.count.to_string() + "\n";
+            }
+        } else {
+            if t.count > 0 {
+                out = out + t.path + "\n";
+            }
+        }
+        i = i + 1;
+    }
+    return out;
+}
+
+pub fn render_truncation(dropped: Int) -> String {
+    if dropped <= 0 { return ""; }
+    return "oogrep: " + dropped.to_string() + " additional match(es) suppressed by emission budget\n";
+}

@@ -1,0 +1,120 @@
+// # MCP Dispatch - Tool Call Routing
+//
+// Logline: Routes a JSON-RPC request to the search pipeline and wraps the outcome as an MCP tool result.
+//
+// Setup: Requires FsReadCap only. Session state and tool name are validated before any work starts.
+//
+// Beats:
+//   1. Reject any call made before initialize with JSON-RPC error -32600.
+//   2. Validate the tool name and the required pattern argument, failing closed.
+//   3. Run the search and wrap bounded text with match telemetry.
+
+import "json_field.oo";
+import "parse_decimal.oo";
+import "schema.oo";
+import "search.oo";
+import "search_opts.oo";
+
+fn default_max_chars() -> Int { return 4000; }
+
+fn max_chars_cap() -> Int { return 65536; }
+
+fn arg_int(args: String, key: String, fallback: Int) -> Int {
+    return parse_decimal(json_field_raw(args, key), fallback);
+}
+
+fn arg_bool(args: String, key: String) -> Bool {
+    return json_field_raw(args, key) == "true";
+}
+
+fn clamp_max_chars(n: Int) -> Int {
+    if n <= 0 { return default_max_chars(); }
+    if n > max_chars_cap() { return max_chars_cap(); }
+    return n;
+}
+
+// A JSON-RPC id may be a number, a string, or absent on notifications. Absent
+// becomes null so the reply envelope stays parseable rather than truncated.
+fn normalize_id(raw: String) -> String {
+    if chars_len(str_trim(raw)) == 0 { return "null"; }
+    return raw;
+}
+
+fn call_search(fs: &FsReadCap, id: String, req: String) -> String {
+    let params: String = json_field_raw(req, "params");
+    let name: String = json_field_string(params, "name");
+    if name != "search" {
+        return build_error(id, -32601, "unknown tool: " + name);
+    }
+    let args: String = json_field_raw(params, "arguments");
+    let pattern: String = json_field_string(args, "pattern");
+    if chars_len(str_trim(pattern)) == 0 {
+        return build_error(id, -32602, "missing required argument: pattern");
+    }
+    let root_arg: String = json_field_string(args, "path");
+    let glob_arg: String = json_field_string(args, "glob");
+    let root: String = if chars_len(root_arg) > 0 { root_arg } else { "." };
+    let glob: String = if chars_len(glob_arg) > 0 { glob_arg } else { "" };
+
+    let one_root: List[String] = list_new();
+    let roots: List[String] = list_push(one_root, root);
+    let o: SearchOpts = SearchOpts {
+        pattern: pattern,
+        roots: roots,
+        glob: glob,
+        ignore_case: arg_bool(args, "ignore_case"),
+        invert: arg_bool(args, "invert"),
+        count_mode: false,
+        files_only: false,
+        show_lines: true,
+        color: false,
+        max_depth: arg_int(args, "max_depth", default_depth()),
+        respect_ignore: true,
+        budget: 0,
+        quiet: false,
+        max_count: arg_int(args, "max_matches", 0),
+        whole_word: arg_bool(args, "whole_word"),
+        ctx_before: arg_int(args, "context_before", 0),
+        ctx_after: arg_int(args, "context_after", 0),
+        show_column: false,
+        show_filename: true,
+        filename_auto: false,
+        json_mode: false
+    };
+
+    let out: SearchOutcome = run_search(fs, o);
+    if !out.ok {
+        return build_error(id, -32602, out.err);
+    }
+
+    let cap: Int = clamp_max_chars(arg_int(args, "max_chars", default_max_chars()));
+    let text: String = out.text;
+    let mut clipped: Bool = false;
+    let body: String = if chars_len(text) > cap {
+        clipped = true;
+        str_slice(text, 0, cap) + "...[truncated]"
+    } else {
+        text
+    };
+    let flag: String = if clipped { "true" } else { "false" };
+
+    let payload: String = "{\"content\":[{\"type\":\"text\",\"text\":\"" + json_escape(body) + "\"}],\"files_scanned\":" + out.files_scanned.to_string() + ",\"matched_files\":" + out.matched_files.to_string() + ",\"total_matches\":" + out.total_matches.to_string() + ",\"skipped\":" + out.skipped.to_string() + ",\"truncated\":" + flag + ",\"isError\":false}";
+    return "{\"jsonrpc\":\"2.0\",\"id\":" + id + ",\"result\":" + payload + "}";
+}
+
+pub fn mcp_dispatch(fs: &FsReadCap, req: String, initialized: Bool) -> String {
+    let id: String = normalize_id(json_field_raw(req, "id"));
+    let method: String = json_field_string(req, "method");
+
+    if method == "initialize" { return build_initialize(id); }
+    if method == "ping" { return "{\"jsonrpc\":\"2.0\",\"id\":" + id + ",\"result\":{}}"; }
+    if !initialized { return build_error(id, -32600, "server not initialized"); }
+    if method == "tools/list" { return build_tools_list(id); }
+    if method == "tools/call" { return call_search(fs, id, req); }
+    if method == "shutdown" { return "{\"jsonrpc\":\"2.0\",\"id\":" + id + ",\"result\":{}}"; }
+    return build_error(id, -32601, "unknown method: " + method);
+}
+
+pub fn dispatch_default_max_chars() -> Int {
+    return default_max_chars();
+}

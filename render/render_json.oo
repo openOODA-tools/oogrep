@@ -1,0 +1,108 @@
+// # Render JSON - Machine Readable Result Envelope
+//
+// Logline: Renders one search outcome as a single JSON object for scripts and agents.
+//
+// Setup: Pure. Consumes ranked hits, tallies, and telemetry. Never reads the filesystem.
+//
+// Beats:
+//   1. Escape every string so the envelope stays parseable.
+//   2. Emit the matches, counts, and files arrays for the active mode.
+//   3. Wrap the arrays with telemetry in one trailing-newline object.
+// grep prints text only, so scripts must scrape it. This page is the
+// better-than-grep surface: one stable object with every field always present.
+
+import "match/scan_lines.oo";
+import "match/rank_hits.oo";
+
+fn json_version() -> String { return "0.2.0"; }
+
+pub fn json_escape_text(s: String) -> String {
+    let n: Int = chars_len(s);
+    let mut out: String = "";
+    let mut i: Int = 0;
+    while i < n {
+        let c: String = char_at(s, i);
+        if c == "\"" { out = out + "\\\""; }
+        else if c == "\\" { out = out + "\\\\"; }
+        else if c == "\n" { out = out + "\\n"; }
+        else if c == "\r" { out = out + "\\r"; }
+        else if c == "\t" { out = out + "\\t"; }
+        else { out = out + c; }
+        i = i + 1;
+    }
+    return out;
+}
+
+fn json_bool(b: Bool) -> String {
+    if b { return "true"; }
+    return "false";
+}
+
+fn hit_json(h: Hit) -> String {
+    let s: String = "{\"path\":\"" + json_escape_text(h.path) + "\"";
+    let l: String = ",\"line\":" + h.line_no.to_string();
+    let c: String = ",\"column\":" + h.col.to_string();
+    let m: String = ",\"length\":" + h.match_len.to_string();
+    let x: String = ",\"context\":" + json_bool(h.context);
+    let t: String = ",\"text\":\"" + json_escape_text(h.line_text) + "\"}";
+    return s + l + c + m + x + t;
+}
+
+fn tally_json(t: FileTally) -> String {
+    return "{\"path\":\"" + json_escape_text(t.path) + "\",\"count\":" + t.count.to_string() + "}";
+}
+
+fn matches_array(hits: List[Hit]) -> String {
+    let mut out: String = "[";
+    let n: Int = list_len(hits);
+    let mut i: Int = 0;
+    while i < n {
+        if i > 0 { out = out + ","; }
+        out = out + hit_json(list_get(hits, i));
+        i = i + 1;
+    }
+    return out + "]";
+}
+
+fn counts_array(tallies: List[FileTally]) -> String {
+    let mut out: String = "[";
+    let n: Int = list_len(tallies);
+    let mut i: Int = 0;
+    while i < n {
+        if i > 0 { out = out + ","; }
+        out = out + tally_json(list_get(tallies, i));
+        i = i + 1;
+    }
+    return out + "]";
+}
+
+fn files_array(tallies: List[FileTally]) -> String {
+    let mut out: String = "[";
+    let mut first: Bool = true;
+    let n: Int = list_len(tallies);
+    let mut i: Int = 0;
+    while i < n {
+        let t: FileTally = list_get(tallies, i);
+        if t.count > 0 {
+            if !first { out = out + ","; }
+            out = out + "\"" + json_escape_text(t.path) + "\"";
+            first = false;
+        }
+        i = i + 1;
+    }
+    return out + "]";
+}
+
+pub fn json_envelope(pattern: String, mode: String, hits: List[Hit], tallies: List[FileTally], scanned: Int, matched: Int, total: Int, dropped: Int, skipped: Int) -> String {
+    let matches: String = if mode == "lines" { matches_array(hits) } else { "[]" };
+    let counts: String = if mode == "count" { counts_array(tallies) } else { "[]" };
+    let files: String = if mode == "files" { files_array(tallies) } else { "[]" };
+    let head: String = "{\"tool\":\"oogrep\",\"version\":\"" + json_version() + "\",\"pattern\":\"" + json_escape_text(pattern) + "\",\"mode\":\"" + mode + "\"";
+    let arrays: String = ",\"matches\":" + matches + ",\"counts\":" + counts + ",\"files\":" + files;
+    let tele: String = ",\"files_scanned\":" + scanned.to_string() + ",\"matched_files\":" + matched.to_string() + ",\"total_matches\":" + total.to_string() + ",\"dropped\":" + dropped.to_string() + ",\"skipped\":" + skipped.to_string() + ",\"truncated\":" + json_bool(dropped > 0) + "}\n";
+    return head + arrays + tele;
+}
+
+pub fn json_anchor_probe() -> String {
+    return "json-active";
+}

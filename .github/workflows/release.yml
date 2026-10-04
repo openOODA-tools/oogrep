@@ -1,0 +1,117 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: oogrep
+
+      - name: Install openOODA toolchain
+        run: |
+          curl -fsSL https://openooda.org/install.sh -o /tmp/ooda-install.sh
+          OPENOODA_YES=1 bash /tmp/ooda-install.sh
+          echo "$HOME/.openooda/bin" >> "$GITHUB_PATH"
+
+      - name: Clone sibling std and oojq
+        working-directory: ${{ github.workspace }}
+        run: |
+          git clone --depth 1 https://github.com/openOODA/std std
+          git clone --depth 1 https://github.com/openOODA-tools/oojq oojq
+
+      - name: Build, verify, and test
+        working-directory: ${{ github.workspace }}/oogrep
+        run: |
+          export PATH="$HOME/.openooda/bin:$PATH"
+          make all
+
+      - name: Stage release asset
+        working-directory: ${{ github.workspace }}
+        run: |
+          cp oogrep/dist/oogrep oogrep-linux-${{ matrix.arch }}
+          sha256sum oogrep-linux-${{ matrix.arch }} > oogrep-linux-${{ matrix.arch }}.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oogrep-linux-${{ matrix.arch }}
+          path: |
+            oogrep-linux-${{ matrix.arch }}
+            oogrep-linux-${{ matrix.arch }}.sha256
+
+  package:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: oogrep
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: oogrep-linux-x86_64
+          path: ${{ github.workspace }}/dist
+
+      - name: Build .deb
+        working-directory: ${{ github.workspace }}
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq debhelper
+          cp -r oogrep/packaging/debian oogrep/debian
+          cd oogrep && dpkg-buildpackage -us -uc -b
+          ls ../*.deb
+
+      - name: Build .rpm
+        working-directory: ${{ github.workspace }}
+        run: |
+          sudo apt-get install -y -qq rpm
+          mkdir -p ~/rpmbuild/SOURCES ~/rpmbuild/SPECS ~/rpmbuild/RPMS
+          cp dist/oogrep-linux-x86_64 ~/rpmbuild/SOURCES/
+          sed "s/^Version:.*/Version: ${GITHUB_REF_NAME#v}/" oogrep/packaging/oogrep.spec > ~/rpmbuild/SPECS/oogrep.spec
+          rpmbuild -bb ~/rpmbuild/SPECS/oogrep.spec
+          cp ~/rpmbuild/RPMS/x86_64/*.rpm .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oogrep-packages
+          path: |
+            ${{ github.workspace }}/*.deb
+            ${{ github.workspace }}/*.rpm
+
+  publish:
+    needs: [build, package]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: ${{ github.workspace }}/assets
+
+      - name: Create GitHub release
+        working-directory: ${{ github.workspace }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          find assets -type f | sort
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "oogrep ${GITHUB_REF_NAME}" \
+            --notes "oogrep ${GITHUB_REF_NAME}: grep-compatible search plus JSON output, .gitignore-aware skipping, and an MCP agent surface. 100% openOODA. Install: curl -fsSL https://openooda-tools.github.io/oogrep/install.sh | bash" \
+            assets/oogrep-linux-x86_64/oogrep-linux-x86_64 \
+            assets/oogrep-linux-x86_64/oogrep-linux-x86_64.sha256 \
+            assets/oogrep-linux-aarch64/oogrep-linux-aarch64 \
+            assets/oogrep-linux-aarch64/oogrep-linux-aarch64.sha256 \
+            assets/oogrep-packages/*.deb \
+            assets/oogrep-packages/*.rpm

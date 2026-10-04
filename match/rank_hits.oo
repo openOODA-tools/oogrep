@@ -1,0 +1,75 @@
+// # Rank Hits - Emission Budget And Per File Tally
+//
+// Logline: Caps emitted hits to a caller budget and tallies matches per file for summary modes.
+//
+// Setup: Pure. Consumes a hit list already grouped by path in traversal order.
+//
+// Beats:
+//   1. Walk hits in order, closing the previous file tally whenever the path changes.
+//   2. Admit hits until the emission budget is exhausted, counting the overflow.
+//   3. Return kept hits, per-file tallies, the dropped count, and the matched file count.
+
+import "scan_lines.oo";
+
+pub type FileTally = struct {
+    path: String,
+    count: Int
+};
+
+pub type RankedHits = struct {
+    hits: List[Hit],
+    tallies: List[FileTally],
+    dropped: Int,
+    matched_files: Int
+};
+
+pub fn rank_hits(hits: List[Hit], budget: Int, scanned: List[String]) -> RankedHits {
+    let mut kept: List[Hit] = list_new();
+    let mut runs: List[FileTally] = list_new();
+    let mut dropped: Int = 0;
+    let mut cur_path: String = "";
+    let mut cur_count: Int = 0;
+    let n: Int = list_len(hits);
+    let mut i: Int = 0;
+    while i < n {
+        let h: Hit = list_get(hits, i);
+        if chars_len(cur_path) > 0 && h.path != cur_path {
+            runs = list_push(runs, FileTally { path: cur_path, count: cur_count });
+            cur_count = 0;
+        }
+        cur_path = h.path;
+        cur_count = cur_count + 1;
+        if budget <= 0 || list_len(kept) < budget {
+            kept = list_push(kept, h);
+        } else {
+            dropped = dropped + 1;
+        }
+        i = i + 1;
+    }
+    if chars_len(cur_path) > 0 {
+        runs = list_push(runs, FileTally { path: cur_path, count: cur_count });
+    }
+    // One tally per scanned path in scanned order, zeros included, so -c
+    // reports every input the way grep does. Runs arrive in scanned order.
+    let mut tallies: List[FileTally] = list_new();
+    let mut matched_files: Int = 0;
+    let ns: Int = list_len(scanned);
+    let nruns: Int = list_len(runs);
+    let mut si: Int = 0;
+    let mut rp: Int = 0;
+    while si < ns {
+        let p: String = list_get(scanned, si);
+        let mut c: Int = 0;
+        if rp < nruns {
+            let rt: FileTally = list_get(runs, rp);
+            if rt.path == p {
+                c = rt.count;
+                rp = rp + 1;
+            }
+        }
+        if c > 0 { matched_files = matched_files + 1; }
+        tallies = list_push(tallies, FileTally { path: p, count: c });
+        si = si + 1;
+    }
+    return RankedHits { hits: kept, tallies: tallies, dropped: dropped, matched_files: matched_files };
+}
