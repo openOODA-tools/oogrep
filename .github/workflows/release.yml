@@ -9,14 +9,7 @@ permissions:
 
 jobs:
   build:
-    strategy:
-      matrix:
-        include:
-          - runner: ubuntu-latest
-            arch: x86_64
-          - runner: ubuntu-24.04-arm
-            arch: aarch64
-    runs-on: ${{ matrix.runner }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
@@ -64,15 +57,15 @@ jobs:
       - name: Stage release asset
         working-directory: ${{ github.workspace }}
         run: |
-          cp oogrep/dist/oogrep oogrep-linux-${{ matrix.arch }}
-          sha256sum oogrep-linux-${{ matrix.arch }} > oogrep-linux-${{ matrix.arch }}.sha256
+          cp oogrep/dist/oogrep oogrep-linux-x86_64
+          sha256sum oogrep-linux-x86_64 > oogrep-linux-x86_64.sha256
 
       - uses: actions/upload-artifact@v4
         with:
-          name: oogrep-linux-${{ matrix.arch }}
+          name: oogrep-linux-x86_64
           path: |
-            oogrep-linux-${{ matrix.arch }}
-            oogrep-linux-${{ matrix.arch }}.sha256
+            oogrep-linux-x86_64
+            oogrep-linux-x86_64.sha256
 
   package:
     needs: build
@@ -132,7 +125,5 @@ jobs:
             --notes "oogrep ${GITHUB_REF_NAME}: grep-compatible search plus JSON output, .gitignore-aware skipping, and an MCP agent surface. 100% openOODA. Install: curl -fsSL https://openooda-tools.github.io/oogrep/install.sh | bash" \
             assets/oogrep-linux-x86_64/oogrep-linux-x86_64 \
             assets/oogrep-linux-x86_64/oogrep-linux-x86_64.sha256 \
-            assets/oogrep-linux-aarch64/oogrep-linux-aarch64 \
-            assets/oogrep-linux-aarch64/oogrep-linux-aarch64.sha256 \
             assets/oogrep-packages/*.deb \
             assets/oogrep-packages/*.rpm
