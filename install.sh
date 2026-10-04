@@ -353,10 +353,10 @@ if [ "$PATH_OK" -eq 0 ]; then
     say ""
 fi
 
-say "  ${BOLD}Enter your sovereign shell right now:${RESET}"
-say "    ${AMBER}${BOLD}${INSTALL_DIR}/oogrep${RESET}"
+say "  ${BOLD}Try it right now:${RESET}"
+say "    ${AMBER}${BOLD}${INSTALL_DIR}/oogrep --help${RESET}"
+say "    ${AMBER}${BOLD}${INSTALL_DIR}/oogrep -n \"TODO\" .${RESET}"
 say ""
-say "  ${BOLD}Make oogrep your default login shell:${RESET}"
-say "    ${DIM}echo \"${INSTALL_DIR}/oogrep\" | sudo tee -a /etc/shells${RESET}"
-say "    ${BOLD}chsh -s \"${INSTALL_DIR}/oogrep\"${RESET}"
+say "  ${BOLD}Machine-readable output for scripts and agents:${RESET}"
+say "    ${DIM}${INSTALL_DIR}/oogrep --json \"TODO\" .${RESET}"
 say ""
