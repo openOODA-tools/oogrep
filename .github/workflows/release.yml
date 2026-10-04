@@ -22,23 +22,44 @@ jobs:
         with:
           path: oogrep
 
-      - name: Install openOODA toolchain
-        run: |
-          curl -fsSL https://openooda.org/install.sh -o /tmp/ooda-install.sh
-          OPENOODA_YES=1 bash /tmp/ooda-install.sh
-          echo "$HOME/.openooda/bin" >> "$GITHUB_PATH"
+      - uses: actions/checkout@v4
+        with:
+          repository: openOODA/oodac
+          path: oodac
 
-      - name: Clone sibling std and oojq
+      - uses: actions/checkout@v4
+        with:
+          repository: openOODA/oodar
+          path: oodar
+
+      - uses: actions/checkout@v4
+        with:
+          repository: openOODA/std
+          path: std
+
+      - uses: actions/checkout@v4
+        with:
+          repository: openOODA-tools/oojq
+          path: oojq
+
+      - name: Require compiler and clang
         working-directory: ${{ github.workspace }}
         run: |
-          git clone --depth 1 https://github.com/openOODA/std std
-          git clone --depth 1 https://github.com/openOODA-tools/oojq oojq
+          test -x oodac/bin/oodac || chmod +x oodac/bin/oodac
+          if ! command -v clang >/dev/null; then sudo apt-get update && sudo apt-get install -y clang; fi
+          command -v clang >/dev/null || { echo "clang required for oodac build (LLVM IR + oodar)"; exit 1; }
+
+      - name: Build oodar libs
+        working-directory: ${{ github.workspace }}
+        run: make -C oodar/scripts -f Makefile modular
 
       - name: Build, verify, and test
         working-directory: ${{ github.workspace }}/oogrep
-        run: |
-          export PATH="$HOME/.openooda/bin:$PATH"
-          make all
+        env:
+          OODA_COMPILER: ${{ github.workspace }}/oodac/bin/oodac
+          OODA_FS_READDIR: ${{ github.workspace }}
+          OODA_FS_WRITEDIR: ${{ github.workspace }}
+        run: make all
 
       - name: Stage release asset
         working-directory: ${{ github.workspace }}
