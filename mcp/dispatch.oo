@@ -48,10 +48,16 @@ fn call_search(fs: &FsReadCap, id: String, req: String) -> String {
     }
     let args: String = json_field_raw(params, "arguments");
     let pattern: String = json_field_string(args, "pattern");
-    if chars_len(str_trim(pattern)) == 0 {
+    if chars_len(pattern) == 0 {
         return build_error(id, -32602, "missing required argument: pattern");
     }
     let root_arg: String = json_field_string(args, "path");
+    if chars_len(root_arg) > 0 {
+        let tr: String = str_trim(root_arg);
+        if str_starts_with(tr, "/") || str_starts_with(tr, "~") || str_starts_with(tr, "\\") || str_index_of(tr, "..") >= 0 {
+            return build_error(id, -32602, "path outside workspace: " + root_arg);
+        }
+    }
     let glob_arg: String = json_field_string(args, "glob");
     let root: String = if chars_len(root_arg) > 0 { root_arg } else { "." };
     let glob: String = if chars_len(glob_arg) > 0 { glob_arg } else { "" };
@@ -103,8 +109,12 @@ fn call_search(fs: &FsReadCap, id: String, req: String) -> String {
 }
 
 pub fn mcp_dispatch(fs: &FsReadCap, req: String, initialized: Bool) -> String {
-    let id: String = normalize_id(json_field_raw(req, "id"));
+    let raw_id: String = json_field_raw(req, "id");
     let method: String = json_field_string(req, "method");
+    let is_notification: Bool = chars_len(str_trim(raw_id)) == 0 || str_starts_with(method, "notifications/");
+    if is_notification { return ""; }
+
+    let id: String = normalize_id(raw_id);
 
     if method == "initialize" { return build_initialize(id); }
     if method == "ping" { return "{\"jsonrpc\":\"2.0\",\"id\":" + id + ",\"result\":{}}"; }

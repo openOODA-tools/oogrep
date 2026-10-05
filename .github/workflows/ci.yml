@@ -4,6 +4,7 @@ on:
   push:
     branches: [master, main]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   build:
@@ -51,3 +52,13 @@ jobs:
           OODA_FS_READDIR: ${{ github.workspace }}
           OODA_FS_WRITEDIR: ${{ github.workspace }}
         run: make all
+
+      - name: Verify packaging (.deb & .rpm)
+        working-directory: ${{ github.workspace }}/oogrep
+        run: |
+          sudo apt-get install -y -qq rpm
+          make package-deb
+          make package-rpm
+          ls -la dist/*.deb dist/*.rpm
+          sudo dpkg -i dist/oogrep_*_amd64.deb
+          /usr/bin/oogrep --version

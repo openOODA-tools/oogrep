@@ -183,6 +183,11 @@ pub fn scan_text(path: String, body: String, re: Regex, o: SearchOpts) -> List[H
 }
 
 pub fn scan_lines(fs: &FsReadCap, path: String, re: Regex, o: SearchOpts) -> List[Hit] {
+    let sz: Int = fs_file_size(fs, path);
+    if sz <= 0 {
+        let none: List[Hit] = list_new();
+        return none;
+    }
     let r: Result[String, String] = fs_read_file(fs, path);
     if r.is_err() {
         let none: List[Hit] = list_new();

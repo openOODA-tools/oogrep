@@ -52,6 +52,21 @@ fn append_rules(acc: List[IgnoreRule], more: List[IgnoreRule]) -> List[IgnoreRul
     return out;
 }
 
+fn is_dir_symlink(fs: &FsReadCap, path: String) -> Bool {
+    let link_sz: Int = fs_file_size(fs, path);
+    let target_sz: Int = fs_file_size(fs, path + "/.");
+    if link_sz != target_sz { return true; }
+    let stamp: String = oo_file_stamp(fs, path);
+    let colon: Int = str_index_of(stamp, ":");
+    if colon > 0 {
+        let stamp_sz_str: String = str_slice(stamp, 0, colon);
+        if stamp_sz_str != link_sz.to_string() {
+            return true;
+        }
+    }
+    return false;
+}
+
 fn walk_recursive(fs: &FsReadCap, dir: String, depth: Int, max_depth: Int, respect_ignore: Bool, rules: List[IgnoreRule]) -> Admitted {
     let empty_paths: List[String] = list_new();
     let mut out: List[String] = empty_paths;
@@ -66,7 +81,9 @@ fn walk_recursive(fs: &FsReadCap, dir: String, depth: Int, max_depth: Int, respe
         if name != "." && name != ".." && chars_len(name) > 0 {
             let sub: String = join_path(dir, name);
             if fs_is_dir(fs, sub) {
-                if respect_ignore && (is_ignored_dir(name) || ignore_hit(local, sub, true)) {
+                if is_dir_symlink(fs, sub) {
+                    skipped = skipped + 1;
+                } else if respect_ignore && (is_ignored_dir(name) || ignore_hit(local, sub, true)) {
                     skipped = skipped + 1;
                 } else {
                     let child: Admitted = walk_recursive(fs, sub, depth + 1, max_depth, respect_ignore, local);
@@ -77,7 +94,12 @@ fn walk_recursive(fs: &FsReadCap, dir: String, depth: Int, max_depth: Int, respe
                 if respect_ignore && ignore_hit(local, sub, false) {
                     skipped = skipped + 1;
                 } else {
-                    out = list_push(out, sub);
+                    let sz: Int = fs_file_size(fs, sub);
+                    if sz >= 0 {
+                        out = list_push(out, sub);
+                    } else {
+                        skipped = skipped + 1;
+                    }
                 }
             }
         }

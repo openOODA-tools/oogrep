@@ -23,15 +23,32 @@ fn basename_of(path: String) -> String {
     return path;
 }
 
+fn matches_any_glob(patterns: List[String], p: String) -> Bool {
+    let base: String = basename_of(p);
+    let n: Int = list_len(patterns);
+    let mut i: Int = 0;
+    while i < n {
+        let pat: String = str_trim(list_get(patterns, i));
+        if chars_len(pat) > 0 {
+            if glob_matches(pat, base) || glob_matches(pat, p) {
+                return true;
+            }
+        }
+        i = i + 1;
+    }
+    return false;
+}
+
 pub fn filter_by_glob(candidates: List[String], pattern: String) -> List[String] {
     let pat: String = str_trim(pattern);
     if chars_len(pat) == 0 { return candidates; }
+    let pats: List[String] = str_split(pat, ",");
     let mut out: List[String] = list_new();
     let n: Int = list_len(candidates);
     let mut i: Int = 0;
     while i < n {
         let p: String = list_get(candidates, i);
-        if glob_matches(pat, basename_of(p)) || glob_matches(pat, p) {
+        if matches_any_glob(pats, p) {
             out = list_push(out, p);
         }
         i = i + 1;

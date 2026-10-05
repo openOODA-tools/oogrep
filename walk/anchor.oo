@@ -32,6 +32,10 @@ pub fn walk_admit(fs: &FsReadCap, root: String, max_depth: Int, respect_ignore: 
     return Admitted { paths: filter_by_glob(sized, glob), skipped: found.skipped };
 }
 
+pub fn walk_size_budget() -> Int {
+    return kind_size_budget();
+}
+
 pub fn walk_anchor_probe() -> String {
     return collect_ignores();
 }

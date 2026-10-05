@@ -98,6 +98,12 @@ jobs:
           sed "s/^Version:.*/Version: ${GITHUB_REF_NAME#v}/" oogrep/packaging/oogrep.spec > ~/rpmbuild/SPECS/oogrep.spec
           rpmbuild -bb ~/rpmbuild/SPECS/oogrep.spec
           cp ~/rpmbuild/RPMS/x86_64/*.rpm .
+          raw_ver="${GITHUB_REF_NAME#v}"
+          for f in *.rpm; do
+            if [ "$f" != "oogrep-${raw_ver}-1.x86_64.rpm" ]; then
+              cp -f "$f" "oogrep-${raw_ver}-1.x86_64.rpm" || true
+            fi
+          done
 
       - uses: actions/upload-artifact@v4
         with:

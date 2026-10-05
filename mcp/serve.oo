@@ -43,9 +43,9 @@ fn handle_frame(fs: &FsReadCap, line: String, initialized: Bool) -> FrameState {
     let method: String = json_field_string(line, "method");
     let reply: String = mcp_dispatch(fs, line, initialized);
     let mut next_init: Bool = initialized;
-    if method == "initialize" { next_init = true; }
+    if method == "initialize" || method == "notifications/initialized" { next_init = true; }
     let mut stop: Bool = false;
-    if method == "shutdown" { stop = true; }
+    if method == "shutdown" || method == "exit" || method == "notifications/exit" { stop = true; }
     if chars_len(reply) > 0 { println(reply); }
     return FrameState { reply: reply, initialized: next_init, stop: stop };
 }

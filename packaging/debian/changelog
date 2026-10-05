@@ -1,3 +1,9 @@
+oogrep (0.3.0-1) stable; urgency=low
+
+  * Hardened defenses, universal installers (web, dnf, apt), and green CI/CD.
+
+ -- openOODA-tools <ops@openooda.org>  Mon, 05 Oct 2026 00:00:00 +0000
+
 oogrep (0.2.0-1) stable; urgency=low
 
   * JSON output, .gitignore-aware search, MCP skipped telemetry.

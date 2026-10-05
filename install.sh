@@ -8,9 +8,11 @@
 #
 # Options:
 #   --prefix <dir>   Installation directory (default: /usr/local/bin or ~/.local/bin)
+#   --apt, --deb     Install Debian package (.deb) via apt/dpkg
+#   --dnf, --rpm     Install RPM package (.rpm) via dnf
 #   --dry-run        Simulate installation without touching the filesystem
 #   --verify         Perform strict cryptographic SHA-256 integrity verification
-#   --uninstall      Remove oogrep binary from standard system paths
+#   --uninstall      Remove oogrep binary or package from standard system paths
 #   -h, --help       Show this help message
 # ==============================================================================
 
@@ -19,7 +21,8 @@ set -eu
 REPO="openOODA-tools/oogrep"
 GITHUB_URL="https://github.com/${REPO}"
 CANONICAL_URL="https://openooda-tools.github.io/oogrep"
-VERSION_PIN="v0.2.0"
+VERSION_PIN="v0.3.0"
+RAW_VERSION="0.3.0"
 
 # --- Styling & Human Interface Standard ---------------------------------------
 if [ -t 1 ] && [ "${NO_COLOR:-}" = "" ] && [ "${TERM:-dumb}" != "dumb" ]; then
@@ -108,12 +111,12 @@ banner() {
     cat <<'BANNER'
         ╔══════════════════════════════════════════════════════════╗
         ║                                                          ║
-        ║      ██████╗  ██████╗ ███████╗██╗  ██╗                   ║
-        ║     ██╔═══██╗██╔═══██╗██╔════╝██║  ██║                   ║
-        ║     ██║   ██║██║   ██║███████╗███████║                   ║
-        ║     ██║   ██║██║   ██║╚════██║██╔══██║                   ║
-        ║     ╚██████╔╝╚██████╔╝███████║██║  ██║                   ║
-        ║      ╚═════╝  ╚═════╝ ╚══════╝╚═╝  ╚═╝                   ║
+        ║   ██████╗  ██████╗  ██████╗ ██████╗ ███████╗██████╗      ║
+        ║  ██╔═══██╗██╔═══██╗██╔════╝ ██╔══██╗██╔════╝██╔══██╗     ║
+        ║  ██║   ██║██║   ██║██║  ███╗██████╔╝█████╗  ██████╔╝     ║
+        ║  ██║   ██║██║   ██║██║   ██║██╔══██╗██╔══╝  ██╔═══╝      ║
+        ║  ╚██████╔╝╚██████╔╝╚██████╔╝██║  ██║███████╗██║          ║
+        ║   ╚═════╝  ╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚══════╝╚═╝          ║
         ║                                                          ║
         ║                openOODA Recursive Search                 ║
         ║         Fast / Capability-Bounded / Agent-Ready          ║
@@ -144,6 +147,8 @@ VICTORY
 DRY_RUN=0
 DO_UNINSTALL=0
 DO_VERIFY=0
+INSTALL_APT=0
+INSTALL_DNF=0
 CUSTOM_PREFIX=""
 
 while [ $# -gt 0 ]; do
@@ -151,6 +156,8 @@ while [ $# -gt 0 ]; do
         --dry-run) DRY_RUN=1; shift ;;
         --uninstall) DO_UNINSTALL=1; shift ;;
         --verify) DO_VERIFY=1; shift ;;
+        --apt|--deb) INSTALL_APT=1; shift ;;
+        --dnf|--rpm) INSTALL_DNF=1; shift ;;
         --prefix) CUSTOM_PREFIX="$2"; shift 2 ;;
         -h|--help)
             banner
@@ -158,9 +165,11 @@ while [ $# -gt 0 ]; do
             say ""
             say "  ${BOLD}Options:${RESET}"
             say "    ${CYAN}--prefix <dir>${RESET}   Target binary directory (default: /usr/local/bin or ~/.local/bin)"
+            say "    ${CYAN}--apt, --deb${RESET}     Install Debian package (.deb) via apt/dpkg"
+            say "    ${CYAN}--dnf, --rpm${RESET}     Install RPM package (.rpm) via dnf"
             say "    ${CYAN}--dry-run${RESET}        Simulate deployment without modifying host"
             say "    ${CYAN}--verify${RESET}         Verify cryptographic SHA-256 seal and exit"
-            say "    ${CYAN}--uninstall${RESET}      Cleanly remove oogrep binary from system"
+            say "    ${CYAN}--uninstall${RESET}      Cleanly remove oogrep binary or package from system"
             say "    ${CYAN}-h, --help${RESET}       Display this manual"
             say ""
             exit 0
@@ -170,26 +179,90 @@ while [ $# -gt 0 ]; do
 done
 
 banner
-story_line "Attuning your environment to the openOODA sovereign shell…"
+story_line "Attuning your environment to openOODA recursive search…"
 pause 0.3
 
 # --- Uninstall Path -----------------------------------------------------------
 if [ "$DO_UNINSTALL" -eq 1 ]; then
     step "Relinquishing oogrep"
     FOUND=0
-    for p in /usr/local/bin/oogrep "${HOME}/.local/bin/oogrep" "${HOME}/.openooda/bin/oogrep"; do
+    if [ "$DRY_RUN" -eq 1 ]; then
+        dim "Would remove oogrep binary and packages"
+        ok "Dry run complete."
+        say ""
+        exit 0
+    fi
+    if command -v dpkg >/dev/null 2>&1 && dpkg -s oogrep >/dev/null 2>&1; then
+        sudo apt-get remove -y oogrep 2>/dev/null || sudo dpkg -r oogrep 2>/dev/null || true
+        ok "Banished Debian package"
+        FOUND=1
+    elif command -v rpm >/dev/null 2>&1 && rpm -q oogrep >/dev/null 2>&1; then
+        sudo dnf remove -y oogrep 2>/dev/null || sudo rpm -e oogrep 2>/dev/null || true
+        ok "Banished RPM package"
+        FOUND=1
+    fi
+    for p in /usr/local/bin/oogrep "${HOME}/.local/bin/oogrep" "${HOME}/.openooda/bin/oogrep" /usr/bin/oogrep; do
         if [ -f "$p" ]; then
-            if [ "$DRY_RUN" -eq 1 ]; then
-                dim "Would remove $p"
-            else
-                rm -f "$p" 2>/dev/null || sudo rm -f "$p"
-                ok "Banished ${BOLD}$p${RESET}"
-            fi
+            rm -f "$p" 2>/dev/null || sudo rm -f "$p"
+            ok "Banished ${BOLD}$p${RESET}"
             FOUND=1
         fi
     done
     if [ "$FOUND" -eq 0 ]; then
-        warn "No existing oogrep binary detected in standard search paths."
+        warn "No existing oogrep binary or package detected in standard search paths."
+    fi
+    say ""
+    exit 0
+fi
+
+# --- APT / DEB Installation ---
+if [ "$INSTALL_APT" -eq 1 ]; then
+    step "Installing oogrep via APT/dpkg (${VERSION_PIN})"
+    DEB_NAME="oogrep_${RAW_VERSION}-1_amd64.deb"
+    DEB_URL="${GITHUB_URL}/releases/download/${VERSION_PIN}/${DEB_NAME}"
+    if [ "$DRY_RUN" -eq 1 ]; then
+        say "  ${DIM}fetch${RESET}   ${CYAN}${DEB_URL}${RESET}"
+        say "  ${DIM}install${RESET} ${CYAN}sudo dpkg -i ... || sudo apt-get install -f -y${RESET}"
+        say ""
+        ok "Simulation complete. No host modifications made."
+        say ""
+        exit 0
+    fi
+    TMP_DEB="$(mktemp /tmp/oogrep-deb.XXXXXX.deb)"
+    story_line "Fetching ${DEB_NAME} from release channel…"
+    if ! curl -fsSL "$DEB_URL" -o "$TMP_DEB"; then
+        err "Failed to download Debian package from $DEB_URL"
+        rm -f "$TMP_DEB"
+        exit 1
+    fi
+    story_line "Installing Debian package…"
+    sudo dpkg -i "$TMP_DEB" || sudo apt-get install -f -y
+    rm -f "$TMP_DEB"
+    ok "Installed oogrep Debian package."
+    if command -v oogrep >/dev/null 2>&1; then
+        ok "Living proof: ${GREEN}${BOLD}$(oogrep --version)${RESET}"
+    fi
+    say ""
+    exit 0
+fi
+
+# --- DNF / RPM Installation ---
+if [ "$INSTALL_DNF" -eq 1 ]; then
+    step "Installing oogrep via DNF/rpm (${VERSION_PIN})"
+    RPM_NAME="oogrep-${RAW_VERSION}-1.x86_64.rpm"
+    RPM_URL="${GITHUB_URL}/releases/download/${VERSION_PIN}/${RPM_NAME}"
+    if [ "$DRY_RUN" -eq 1 ]; then
+        say "  ${DIM}install${RESET} ${CYAN}sudo dnf install -y ${RPM_URL}${RESET}"
+        say ""
+        ok "Simulation complete. No host modifications made."
+        say ""
+        exit 0
+    fi
+    story_line "Installing RPM package via dnf…"
+    sudo dnf install -y "$RPM_URL" || sudo dnf install -y "${GITHUB_URL}/releases/download/${VERSION_PIN}/oogrep-${RAW_VERSION}-1.fc44.x86_64.rpm"
+    ok "Installed oogrep RPM package."
+    if command -v oogrep >/dev/null 2>&1; then
+        ok "Living proof: ${GREEN}${BOLD}$(oogrep --version)${RESET}"
     fi
     say ""
     exit 0
@@ -313,8 +386,18 @@ else
 fi
 pause 0.3
 
+if [ "$DO_VERIFY" -eq 1 ]; then
+    if [ ! -f "${TMP_DIR}/${ASSET_NAME}.sha256" ] || [ -z "$HASH_CMD" ]; then
+        err "Verification failed: Checksum manifest or hash utility unavailable."
+        exit 1
+    fi
+    ok "Cryptographic verification succeeded. Exiting per --verify."
+    say ""
+    exit 0
+fi
+
 # --- Phase 4: Deploying oogrep ----------------------------------------------------
-step "[4/4]  Awakening sovereign shell"
+step "[4/4]  Awakening sovereign search tool"
 
 if [ ! -d "$INSTALL_DIR" ]; then
     mkdir -p "$INSTALL_DIR" 2>/dev/null || sudo mkdir -p "$INSTALL_DIR"

@@ -7,22 +7,46 @@ Part of [openOODA-tools](https://github.com/openOODA-tools).
 
 ---
 
-## 1. Quick Install (Any Linux Machine)
+## 1. Installation
 
-Zero dependencies. Neither `openOODA` nor `syntropd` is required on the host — the binary is pure native, glibc-linked.
+`oogrep` has zero runtime dependencies. It compiles to a standalone native binary linked directly with the host libc.
+
+### Universal Web Installer
+Installs the standalone native binary to `/usr/local/bin` (or `~/.local/bin`) with automatic SHA-256 seal verification:
 
 ```bash
 curl -fsSL https://openooda-tools.github.io/oogrep/install.sh | bash
 ```
 
-The installer verifies cryptographic SHA-256 checksums, places the binary in `/usr/local/bin` (or `~/.local/bin`), and tests execution.
+### Native Packages (APT & DNF)
+Prebuilt packages are attached to every [GitHub Release](https://github.com/openOODA-tools/oogrep/releases):
+
+```bash
+# Debian, Ubuntu (APT)
+sudo apt install ./oogrep_0.3.0-1_amd64.deb
+
+# Fedora, RHEL, Rocky, Alma (DNF)
+sudo dnf install ./oogrep-0.3.0-1.*.rpm
+```
+
+Or install with package manager flags via the installer:
+```bash
+# Debian / Ubuntu (APT)
+curl -fsSL https://openooda-tools.github.io/oogrep/install.sh | bash -s -- --apt
+
+# Fedora / RHEL (DNF)
+curl -fsSL https://openooda-tools.github.io/oogrep/install.sh | bash -s -- --dnf
+```
 
 ### Options
 ```bash
 # Preview actions without modifying the host
 curl -fsSL https://openooda-tools.github.io/oogrep/install.sh | bash -s -- --dry-run
 
-# Uninstall
+# Verify cryptographic SHA-256 seal only
+curl -fsSL https://openooda-tools.github.io/oogrep/install.sh | bash -s -- --verify
+
+# Uninstall (removes binary or package)
 curl -fsSL https://openooda-tools.github.io/oogrep/install.sh | bash -s -- --uninstall
 ```
 
@@ -47,6 +71,7 @@ The MCP surface speaks JSON-RPC over stdin/stdout. No socket, no port, no daemon
 oogrep [flags] <pattern> [path]
 
 flags:
+  -e, --regexp <pattern>   use pattern for matching
   -g, --glob <pattern>     include files matching glob (repeatable via comma)
   -i, --ignore-case        case-insensitive matching
   -v, --invert-match       select non-matching lines
@@ -119,7 +144,7 @@ oogrep --json "pub fn main" src/
 ```json
 {
   "tool": "oogrep",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "pattern": "pub fn main",
   "mode": "lines",
   "matches": [

@@ -1,0 +1,10 @@
+Package: oogrep
+Version: 0.3.0-1
+Section: utils
+Priority: optional
+Architecture: amd64
+Maintainer: openOODA-tools <ops@openooda.org>
+Description: Capability-bounded recursive regex search
+ A drop-in grep replacement written in openOODA, with
+ machine-readable JSON output and a first-class MCP surface for
+ agent callers.

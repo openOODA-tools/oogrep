@@ -19,7 +19,8 @@ pub fn filter_by_kind(fs: &FsReadCap, candidates: List[String]) -> List[String] 
     let mut i: Int = 0;
     while i < n {
         let p: String = list_get(candidates, i);
-        if fs_file_size(fs, p) <= size_budget() {
+        let sz: Int = fs_file_size(fs, p);
+        if sz >= 0 && sz <= size_budget() {
             out = list_push(out, p);
         }
         i = i + 1;

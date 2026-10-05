@@ -48,15 +48,30 @@ fn stdin_poll_ms() -> Int { return 200; }
 
 fn drain_stdin(fs: &FsReadCap) -> String {
     let mut buf: String = "";
+    let mut total_len: Int = 0;
     let mut running: Bool = true;
+    let limit: Int = walk_size_budget();
     while running {
         let r: Result[String, String] = oo_read_stdin_chunk(fs, stdin_poll_ms());
         if !r.is_ok() {
             running = false;
         } else {
             let chunk: String = match r { Ok(s) => s, Err(_) => "" };
-            if chars_len(chunk) > 0 {
-                buf = buf + chunk;
+            let clen: Int = chars_len(chunk);
+            if clen > 0 {
+                if total_len + clen > limit {
+                    let take: Int = limit - total_len;
+                    if take > 0 {
+                        buf = buf + str_slice(chunk, 0, take);
+                    }
+                    running = false;
+                } else {
+                    buf = buf + chunk;
+                    total_len = total_len + clen;
+                    if total_len >= limit {
+                        running = false;
+                    }
+                }
             }
         }
     }

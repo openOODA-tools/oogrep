@@ -26,7 +26,8 @@ pub fn render_help() -> String {
     s = s + "use '-' as path to search standard input\n";
     s = s + "\n";
     s = s + "flags:\n";
-    s = s + "  -g, --glob <pattern>     include files matching glob\n";
+    s = s + "  -e, --regexp <pattern>   use pattern for matching\n";
+    s = s + "  -g, --glob <pattern>     include files matching glob (repeatable via comma)\n";
     s = s + "  -i, --ignore-case        case-insensitive matching\n";
     s = s + "  -v, --invert-match       select non-matching lines\n";
     s = s + "  -q, --quiet              suppress output, exit code only\n";
@@ -55,5 +56,5 @@ pub fn render_help() -> String {
 }
 
 pub fn render_version() -> String {
-    return "oogrep 0.2.0\n";
+    return "oogrep 0.3.0\n";
 }

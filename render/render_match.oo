@@ -18,7 +18,7 @@ fn esc() -> String {
 }
 
 fn paint(s: String, code: String) -> String {
-    return esc() + code + "m" + s + esc() + "0m";
+    return esc() + "[" + code + "m" + s + esc() + "[0m";
 }
 
 pub fn render_hit(h: Hit, show_lines: Bool, color: Bool, show_column: Bool, show_filename: Bool) -> String {

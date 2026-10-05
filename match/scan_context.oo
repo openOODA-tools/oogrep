@@ -15,6 +15,11 @@ import "locate_span.oo";
 import "search_opts.oo";
 
 pub fn scan_lines_context(fs: &FsReadCap, path: String, re: Regex, o: SearchOpts) -> List[Hit] {
+    let sz: Int = fs_file_size(fs, path);
+    if sz <= 0 {
+        let none: List[Hit] = list_new();
+        return none;
+    }
     let r: Result[String, String] = fs_read_file(fs, path);
     if r.is_err() {
         let none: List[Hit] = list_new();

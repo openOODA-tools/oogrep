@@ -14,20 +14,37 @@
 import "match/scan_lines.oo";
 import "match/rank_hits.oo";
 
-fn json_version() -> String { return "0.2.0"; }
+fn json_version() -> String { return "0.3.0"; }
 
 pub fn json_escape_text(s: String) -> String {
     let n: Int = chars_len(s);
     let mut out: String = "";
     let mut i: Int = 0;
+    let hex_digits: String = "0123456789abcdef";
     while i < n {
         let c: String = char_at(s, i);
-        if c == "\"" { out = out + "\\\""; }
-        else if c == "\\" { out = out + "\\\\"; }
-        else if c == "\n" { out = out + "\\n"; }
-        else if c == "\r" { out = out + "\\r"; }
-        else if c == "\t" { out = out + "\\t"; }
-        else { out = out + c; }
+        let b: Int = byte_at(c, 0);
+        if b == 34 {
+            out = out + "\\\"";
+        } else if b == 92 {
+            out = out + "\\\\";
+        } else if b == 10 {
+            out = out + "\\n";
+        } else if b == 13 {
+            out = out + "\\r";
+        } else if b == 9 {
+            out = out + "\\t";
+        } else if b == 8 {
+            out = out + "\\b";
+        } else if b == 12 {
+            out = out + "\\f";
+        } else if b < 32 {
+            let hi: Int = b / 16;
+            let lo: Int = b % 16;
+            out = out + "\\u00" + char_at(hex_digits, hi) + char_at(hex_digits, lo);
+        } else {
+            out = out + c;
+        }
         i = i + 1;
     }
     return out;

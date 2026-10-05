@@ -1,4 +1,4 @@
-# oogrep v0.2.0 Makefile
+# oogrep v0.3.0 Makefile
 #
 # Build, verify, and test the capability-bounded recursive search tool.
 #
@@ -29,7 +29,7 @@ SRC := main.oo anchor.oo parse_decimal.oo search_opts.oo search.oo \
        mcp/anchor.oo mcp/json_field.oo mcp/schema.oo mcp/dispatch.oo mcp/serve.oo \
        qa/fixtures/main.oo qa/fixtures/alpha.oo qa/fixtures/nested/deep.oo
 
-.PHONY: all build test check line-cap file-law academy density pure verify parity install clean
+.PHONY: all build test check line-cap file-law academy density pure verify parity install package-deb package-rpm package clean
 
 all: build verify test
 
@@ -274,6 +274,36 @@ test: $(BIN)
 	@./$(BIN) --json "pub fn" qa/fixtures --no-color > .ooda-cache/run1j.txt 2>/dev/null || true; \
 	./$(BIN) --json "pub fn" qa/fixtures --no-color > .ooda-cache/run2j.txt 2>/dev/null || true; \
 	cmp -s .ooda-cache/run1j.txt .ooda-cache/run2j.txt && echo "PASS: --json deterministic across runs"
+	@echo "=== testing ANSI CSI color ==="
+	@./$(BIN) "pub fn main" qa/fixtures/main.oo | ./$(BIN) -q "[[]1;31m" - && echo "PASS: ANSI CSI color sequence"
+	@./$(BIN) "pub fn main" qa/fixtures/main.oo | ./$(BIN) -q "[[]0m" - && echo "PASS: ANSI CSI reset sequence"
+	@echo "=== testing option terminator and -e ==="
+	@./$(BIN) -e "pub fn main" qa/fixtures > /dev/null && echo "PASS: -e flag matches"
+	@printf 'flag -i\n' | ./$(BIN) -e -i - > /dev/null && echo "PASS: -e with dash pattern matches"
+	@printf 'hello -i world\n' | ./$(BIN) -- -i - > /dev/null && echo "PASS: -- option terminator"
+	@echo "=== testing glob comma and repeatability ==="
+	@./$(BIN) -g "*.oo,*.oot" -l "pub fn" qa/fixtures | ./$(BIN) -q "beta.oot" -; test $$? -ne 0 && echo "PASS: comma glob filter"
+	@./$(BIN) -g "*.oo" -g "*.oot" -l "pub fn" qa/fixtures | ./$(BIN) -q "beta.oot" -; test $$? -ne 0 && echo "PASS: repeatable glob filter"
+	@echo "=== testing JSON control char escaping ==="
+	@oojq=""; for c in $(OOJQ_CANDIDATES); do if [ -x "$$c" ]; then oojq="$$c"; break; fi; done; \
+	if [ -n "$$oojq" ]; then \
+		printf 'hello\x01\x1fworld\n' | ./$(BIN) --json "hello" - | "$$oojq" '.matches[0].text' | ./$(BIN) -q "hello" - && echo "PASS: json control char escaping"; \
+		printf '—"quote\n' | ./$(BIN) --json "quote" - | "$$oojq" '.matches[0].text' | ./$(BIN) -q "quote" - && echo "PASS: json utf8 quote escaping"; \
+	fi
+	@echo "=== testing mcp notifications and path escaping ==="
+	@printf '{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}\n' | ./$(BIN) --mcp > .ooda-cache/mcp_notif.txt; test ! -s .ooda-cache/mcp_notif.txt && echo "PASS: mcp notification yields no response"
+	@printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}\n{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}\n{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"search","arguments":{"pattern":"pub","path":"/etc"}}}\n{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"search","arguments":{"pattern":"pub","path":"../oojq"}}}\n' | ./$(BIN) --mcp | ./$(BIN) -q -- "-32602" - && echo "PASS: mcp path escaping rejected"
+	@printf '{"jsonrpc":"2.0","method":"notifications/exit","params":{}}\n' | ./$(BIN) --mcp > /dev/null && echo "PASS: mcp notification exit"
+	@echo "=== testing special files and symlinks ==="
+	@rm -rf .ooda-cache/fifo_test; mkdir -p .ooda-cache/fifo_test; mkfifo .ooda-cache/fifo_test/test_fifo 2>/dev/null || true; ./$(BIN) "pub fn" .ooda-cache/fifo_test > /dev/null 2>&1; ./$(BIN) "pub fn" .ooda-cache/fifo_test/test_fifo > /dev/null 2>&1; rm -rf .ooda-cache/fifo_test && echo "PASS: fifo non-hanging"
+	@rm -f .ooda-cache/empty.txt; touch .ooda-cache/empty.txt; ./$(BIN) --no-color -c "foo" .ooda-cache/empty.txt | ./$(BIN) -q "^0$$" -; test $$? -eq 0; rm -f .ooda-cache/empty.txt && echo "PASS: 0-byte file count is 0"
+	@rm -rf .ooda-cache/sym_test; mkdir -p .ooda-cache/sym_test/child; ln -s child .ooda-cache/sym_test/loop 2>/dev/null || true; printf "unique_sym\n" > .ooda-cache/sym_test/child/f.txt; \
+	./$(BIN) --no-filename -c "unique_sym" .ooda-cache/sym_test | ./$(BIN) -q "^1$$" - && echo "PASS: symlink directory skipped"; rm -rf .ooda-cache/sym_test
+	@echo "=== testing install.sh ==="
+	@./install.sh --verify > /dev/null && echo "PASS: install.sh --verify"
+	@./$(BIN) -i -q "Recursive Search" install.sh && echo "PASS: install.sh banner text"
+	@{ ./$(BIN) -i -q "oosh" install.sh; test $$? -ne 0; } && echo "PASS: install.sh no oosh"
+
 
 parity: build
 	@sum=$$(sha256sum $(BIN) | awk '{print $$1}'); echo $$sum; test -n "$$sum"
@@ -283,6 +313,27 @@ install: build
 	cp -a $(BIN) $(HOME)/.openooda/bin/oogrep
 	@chmod +x $(HOME)/.openooda/bin/oogrep
 	@echo "installed $(HOME)/.openooda/bin/oogrep"
+
+VERSION ?= 0.3.0
+
+package-deb: $(BIN)
+	@mkdir -p dist/deb-root/DEBIAN dist/deb-root/usr/bin
+	@sed "s/^Version:.*/Version: $(VERSION)-1/" packaging/debian/control.binary > dist/deb-root/DEBIAN/control
+	@cp $(BIN) dist/deb-root/usr/bin/oogrep
+	@chmod 0755 dist/deb-root/usr/bin/oogrep
+	@dpkg-deb --build --root-owner-group dist/deb-root dist/oogrep_$(VERSION)-1_amd64.deb
+	@rm -rf dist/deb-root
+	@echo "built dist/oogrep_$(VERSION)-1_amd64.deb"
+
+package-rpm: $(BIN)
+	@mkdir -p ~/rpmbuild/SOURCES ~/rpmbuild/SPECS ~/rpmbuild/RPMS
+	@cp $(BIN) ~/rpmbuild/SOURCES/oogrep-linux-x86_64
+	@sed "s/^Version:.*/Version: $(VERSION)/" packaging/oogrep.spec > ~/rpmbuild/SPECS/oogrep.spec
+	@rpmbuild -bb ~/rpmbuild/SPECS/oogrep.spec
+	@cp ~/rpmbuild/RPMS/x86_64/oogrep-$(VERSION)*.rpm dist/
+	@echo "built dist RPM package"
+
+package: package-deb package-rpm
 
 clean:
 	@rm -rf dist .ooda-cache
