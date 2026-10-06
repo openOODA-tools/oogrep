@@ -166,7 +166,7 @@ pub fn run_search(fs: &FsReadCap, o: SearchOpts) -> SearchOutcome {
             if ctx_on && h.path == prev_path && prev_line >= 0 && h.line_no > prev_line + 1 {
                 body = body + "--\n";
             }
-            body = body + render_hit(h, o.show_lines, o.color, o.show_column, show_fn) + "\n";
+            body = body + render_hit(h, o.show_lines, o.color, o.show_column, show_fn, o.theme) + "\n";
             prev_path = h.path;
             prev_line = h.line_no;
             i = i + 1;

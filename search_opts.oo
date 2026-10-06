@@ -32,7 +32,8 @@ pub type SearchOpts = struct {
     show_column: Bool,
     show_filename: Bool,
     filename_auto: Bool,
-    json_mode: Bool
+    json_mode: Bool,
+    theme: String
 };
 
 pub fn default_depth() -> Int { return 32; }
@@ -62,7 +63,8 @@ pub fn opts_defaults() -> SearchOpts {
         show_column: false,
         show_filename: true,
         filename_auto: true,
-        json_mode: false
+        json_mode: false,
+        theme: "auto"
     };
 }
 

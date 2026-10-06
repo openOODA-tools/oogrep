@@ -13,6 +13,7 @@ import "parse_decimal.oo";
 import "search_opts.oo";
 import "search.oo";
 import "render/render_errors.oo";
+import "render/render_theme.oo";
 import "mcp/serve.oo";
 
 fn has_flag(args: List[String], short: String, long: String) -> Bool {
@@ -33,7 +34,7 @@ fn arg_value(args: List[String], idx: Int) -> String {
     return list_get(args, idx + 1);
 }
 
-fn parse_args(args: List[String]) -> Result[SearchOpts, String] {
+fn parse_args(args: List[String], theme: String) -> Result[SearchOpts, String] {
     let mut pattern: String = "";
     let mut roots: List[String] = list_new();
     let mut glob: String = "";
@@ -170,7 +171,8 @@ fn parse_args(args: List[String]) -> Result[SearchOpts, String] {
         show_column: show_column,
         show_filename: show_filename,
         filename_auto: filename_auto,
-        json_mode: json_mode
+        json_mode: json_mode,
+        theme: theme
     });
 }
 
@@ -178,14 +180,15 @@ fn parse_args(args: List[String]) -> Result[SearchOpts, String] {
 // so a non-zero status must be raised explicitly. process_exit is classified
 // under ProcessCap, so that token is declared here purely to raise the exit
 // status. oogrep never spawns a process and never uses it for anything else.
-pub fn main(fs: &FsReadCap, proc_cap: &ProcessCap, args: List[String]) -> Result[Int, String] {
+pub fn main(fs: &FsReadCap, proc_cap: &ProcessCap, env: &EnvCap, args: List[String]) -> Result[Int, String] {
     if has_flag(args, "", "--mcp") {
         let mcp_rc: Int = mcp_serve(fs);
         if mcp_rc != 0 { process_exit(mcp_rc); }
         return Ok(mcp_rc);
     }
 
-    let parsed: Result[SearchOpts, String] = parse_args(args);
+    let theme: String = resolve_grep_theme(fs, env);
+    let parsed: Result[SearchOpts, String] = parse_args(args, theme);
     if parsed.is_err() {
         let m: String = match parsed { Ok(_) => "", Err(e) => e };
         if m == "__help" || m == "__version" { return Ok(0); }

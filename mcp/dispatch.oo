@@ -85,7 +85,8 @@ fn call_search(fs: &FsReadCap, id: String, req: String) -> String {
         show_column: false,
         show_filename: true,
         filename_auto: false,
-        json_mode: false
+        json_mode: false,
+        theme: "auto"
     };
 
     let out: SearchOutcome = run_search(fs, o);
