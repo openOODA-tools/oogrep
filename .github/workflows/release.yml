@@ -105,12 +105,21 @@ jobs:
             fi
           done
 
+      - name: Build PKGBUILD
+        working-directory: ${{ github.workspace }}
+        run: |
+          raw_ver="${GITHUB_REF_NAME#v}"
+          sum=$(awk '{print $1}' dist/oogrep-linux-x86_64.sha256)
+          sed -e "s/^pkgver=.*/pkgver=${raw_ver}/" -e "s/^sha256sums=.*/sha256sums=('${sum}')/" oogrep/packaging/PKGBUILD > PKGBUILD
+          bash -n PKGBUILD
+
       - uses: actions/upload-artifact@v4
         with:
           name: oogrep-packages
           path: |
             ${{ github.workspace }}/*.deb
             ${{ github.workspace }}/*.rpm
+            ${{ github.workspace }}/PKGBUILD
 
   publish:
     needs: [build, package]
@@ -134,4 +143,5 @@ jobs:
             assets/oogrep-linux-x86_64/oogrep-linux-x86_64 \
             assets/oogrep-linux-x86_64/oogrep-linux-x86_64.sha256 \
             assets/oogrep-packages/*.deb \
-            assets/oogrep-packages/*.rpm
+            assets/oogrep-packages/*.rpm \
+            assets/oogrep-packages/PKGBUILD

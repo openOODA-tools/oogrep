@@ -1,5 +1,5 @@
 Name:           oogrep
-Version:        0.3.0
+Version:        0.3.1
 Release:        1%{?dist}
 Summary:        Capability-bounded recursive regex search
 License:        ASL 2.0
@@ -21,6 +21,8 @@ install -m 0755 %{SOURCE0} %{buildroot}/usr/bin/oogrep
 /usr/bin/oogrep
 
 %changelog
+* Tue Oct 06 2026 openOODA-tools <ops@openooda.org> - 0.3.1-1
+- Arch Linux PKGBUILD support and expanded package installation methods
 * Mon Oct 05 2026 openOODA-tools <ops@openooda.org> - 0.3.0-1
 - Hardened defenses, universal installers (web, dnf, apt), and green CI/CD
 * Sat Oct 03 2026 openOODA-tools <ops@openooda.org> - 0.2.0-1

@@ -53,12 +53,14 @@ jobs:
           OODA_FS_WRITEDIR: ${{ github.workspace }}
         run: make all
 
-      - name: Verify packaging (.deb & .rpm)
+      - name: Verify packaging (.deb, .rpm, and pkgbuild)
         working-directory: ${{ github.workspace }}/oogrep
         run: |
           sudo apt-get install -y -qq rpm
           make package-deb
           make package-rpm
-          ls -la dist/*.deb dist/*.rpm
+          make package-arch
+          ls -la dist/*.deb dist/*.rpm dist/PKGBUILD
           sudo dpkg -i dist/oogrep_*_amd64.deb
           /usr/bin/oogrep --version
+          bash -n dist/PKGBUILD

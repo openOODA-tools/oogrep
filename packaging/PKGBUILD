@@ -1,0 +1,17 @@
+# Maintainer: openOODA Authors <https://github.com/openOODA-tools>
+pkgname=oogrep-bin
+_pkgname=oogrep
+pkgver=0.3.1
+pkgrel=1
+pkgdesc="Capability-bounded recursive regex search for the openOODA era"
+arch=('x86_64')
+url="https://github.com/openOODA-tools/oogrep"
+license=('MIT')
+provides=("${_pkgname}=${pkgver}")
+conflicts=("${_pkgname}")
+source=("${_pkgname}-${pkgver}-linux-x86_64::https://github.com/openOODA-tools/oogrep/releases/download/v${pkgver}/oogrep-linux-x86_64")
+sha256sums=('SKIP')
+
+package() {
+    install -Dm755 "${srcdir}/${_pkgname}-${pkgver}-linux-x86_64" "${pkgdir}/usr/bin/${_pkgname}"
+}

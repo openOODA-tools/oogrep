@@ -1,4 +1,4 @@
-# oogrep v0.3.0 Makefile
+# oogrep v0.3.1 Makefile
 #
 # Build, verify, and test the capability-bounded recursive search tool.
 #
@@ -314,7 +314,7 @@ install: build
 	@chmod +x $(HOME)/.openooda/bin/oogrep
 	@echo "installed $(HOME)/.openooda/bin/oogrep"
 
-VERSION ?= 0.3.0
+VERSION ?= 0.3.1
 
 package-deb: $(BIN)
 	@mkdir -p dist/deb-root/DEBIAN dist/deb-root/usr/bin
@@ -333,7 +333,13 @@ package-rpm: $(BIN)
 	@cp ~/rpmbuild/RPMS/x86_64/oogrep-$(VERSION)*.rpm dist/
 	@echo "built dist RPM package"
 
-package: package-deb package-rpm
+package-arch: $(BIN)
+	@mkdir -p dist
+	@sum=$$(sha256sum $(BIN) | awk '{print $$1}'); \
+	sed -e "s/^pkgver=.*/pkgver=$(VERSION)/" -e "s/^sha256sums=.*/sha256sums=('$$sum')/" packaging/PKGBUILD > dist/PKGBUILD
+	@echo "built dist/PKGBUILD"
+
+package: package-deb package-rpm package-arch
 
 clean:
 	@rm -rf dist .ooda-cache

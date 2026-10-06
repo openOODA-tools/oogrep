@@ -10,6 +10,7 @@
 #   --prefix <dir>   Installation directory (default: /usr/local/bin or ~/.local/bin)
 #   --apt, --deb     Install Debian package (.deb) via apt/dpkg
 #   --dnf, --rpm     Install RPM package (.rpm) via dnf
+#   --pkgbuild, --arch Install Arch Linux package via PKGBUILD / makepkg
 #   --dry-run        Simulate installation without touching the filesystem
 #   --verify         Perform strict cryptographic SHA-256 integrity verification
 #   --uninstall      Remove oogrep binary or package from standard system paths
@@ -21,8 +22,8 @@ set -eu
 REPO="openOODA-tools/oogrep"
 GITHUB_URL="https://github.com/${REPO}"
 CANONICAL_URL="https://openooda-tools.github.io/oogrep"
-VERSION_PIN="v0.3.0"
-RAW_VERSION="0.3.0"
+VERSION_PIN="v0.3.1"
+RAW_VERSION="0.3.1"
 
 # --- Styling & Human Interface Standard ---------------------------------------
 if [ -t 1 ] && [ "${NO_COLOR:-}" = "" ] && [ "${TERM:-dumb}" != "dumb" ]; then
@@ -149,6 +150,7 @@ DO_UNINSTALL=0
 DO_VERIFY=0
 INSTALL_APT=0
 INSTALL_DNF=0
+INSTALL_ARCH=0
 CUSTOM_PREFIX=""
 
 while [ $# -gt 0 ]; do
@@ -158,6 +160,7 @@ while [ $# -gt 0 ]; do
         --verify) DO_VERIFY=1; shift ;;
         --apt|--deb) INSTALL_APT=1; shift ;;
         --dnf|--rpm) INSTALL_DNF=1; shift ;;
+        --pkgbuild|--arch) INSTALL_ARCH=1; shift ;;
         --prefix) CUSTOM_PREFIX="$2"; shift 2 ;;
         -h|--help)
             banner
@@ -167,6 +170,7 @@ while [ $# -gt 0 ]; do
             say "    ${CYAN}--prefix <dir>${RESET}   Target binary directory (default: /usr/local/bin or ~/.local/bin)"
             say "    ${CYAN}--apt, --deb${RESET}     Install Debian package (.deb) via apt/dpkg"
             say "    ${CYAN}--dnf, --rpm${RESET}     Install RPM package (.rpm) via dnf"
+            say "    ${CYAN}--pkgbuild, --arch${RESET} Install Arch Linux package via PKGBUILD / makepkg"
             say "    ${CYAN}--dry-run${RESET}        Simulate deployment without modifying host"
             say "    ${CYAN}--verify${RESET}         Verify cryptographic SHA-256 seal and exit"
             say "    ${CYAN}--uninstall${RESET}      Cleanly remove oogrep binary or package from system"
@@ -199,6 +203,14 @@ if [ "$DO_UNINSTALL" -eq 1 ]; then
     elif command -v rpm >/dev/null 2>&1 && rpm -q oogrep >/dev/null 2>&1; then
         sudo dnf remove -y oogrep 2>/dev/null || sudo rpm -e oogrep 2>/dev/null || true
         ok "Banished RPM package"
+        FOUND=1
+    elif command -v pacman >/dev/null 2>&1 && pacman -Qi oogrep >/dev/null 2>&1; then
+        sudo pacman -R --noconfirm oogrep 2>/dev/null || true
+        ok "Banished Arch package"
+        FOUND=1
+    elif command -v pacman >/dev/null 2>&1 && pacman -Qi oogrep-bin >/dev/null 2>&1; then
+        sudo pacman -R --noconfirm oogrep-bin 2>/dev/null || true
+        ok "Banished Arch package"
         FOUND=1
     fi
     for p in /usr/local/bin/oogrep "${HOME}/.local/bin/oogrep" "${HOME}/.openooda/bin/oogrep" /usr/bin/oogrep; do
@@ -261,6 +273,41 @@ if [ "$INSTALL_DNF" -eq 1 ]; then
     story_line "Installing RPM package via dnf…"
     sudo dnf install -y "$RPM_URL" || sudo dnf install -y "${GITHUB_URL}/releases/download/${VERSION_PIN}/oogrep-${RAW_VERSION}-1.fc44.x86_64.rpm"
     ok "Installed oogrep RPM package."
+    if command -v oogrep >/dev/null 2>&1; then
+        ok "Living proof: ${GREEN}${BOLD}$(oogrep --version)${RESET}"
+    fi
+    say ""
+    exit 0
+fi
+
+# --- Arch Linux / PKGBUILD Installation ---
+if [ "$INSTALL_ARCH" -eq 1 ]; then
+    step "Installing oogrep via PKGBUILD (${VERSION_PIN})"
+    PKGBUILD_URL="https://raw.githubusercontent.com/${REPO}/${VERSION_PIN}/packaging/PKGBUILD"
+    if [ "$DRY_RUN" -eq 1 ]; then
+        say "  ${DIM}fetch${RESET}   ${CYAN}${PKGBUILD_URL}${RESET}"
+        say "  ${DIM}build${RESET}   ${CYAN}makepkg -si --noconfirm${RESET}"
+        say ""
+        ok "Simulation complete. No host modifications made."
+        say ""
+        exit 0
+    fi
+    if ! command -v makepkg >/dev/null 2>&1; then
+        err "makepkg not found. Arch Linux / pacman build tools are required for PKGBUILD installation."
+        say "  Use standard installer instead: ${CYAN}curl -fsSL https://openooda-tools.github.io/oogrep/install.sh | bash${RESET}"
+        exit 1
+    fi
+    TMP_ARCH="$(mktemp -d /tmp/oogrep-pkgbuild.XXXXXX)"
+    story_line "Fetching PKGBUILD from repository…"
+    if ! curl -fsSL "$PKGBUILD_URL" -o "${TMP_ARCH}/PKGBUILD"; then
+        err "Failed to download PKGBUILD from $PKGBUILD_URL"
+        rm -rf "$TMP_ARCH"
+        exit 1
+    fi
+    story_line "Building and installing package via makepkg…"
+    (cd "$TMP_ARCH" && makepkg -si --noconfirm)
+    rm -rf "$TMP_ARCH"
+    ok "Installed oogrep Arch package."
     if command -v oogrep >/dev/null 2>&1; then
         ok "Living proof: ${GREEN}${BOLD}$(oogrep --version)${RESET}"
     fi

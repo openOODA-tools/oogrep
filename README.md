@@ -18,28 +18,39 @@ Installs the standalone native binary to `/usr/local/bin` (or `~/.local/bin`) wi
 curl -fsSL https://openooda-tools.github.io/oogrep/install.sh | bash
 ```
 
-### Native Packages (APT & DNF)
-Prebuilt packages are attached to every [GitHub Release](https://github.com/openOODA-tools/oogrep/releases):
+### Native Packages (DNF, DEB, PKGBUILD)
+Prebuilt packages and package definitions are attached to every [GitHub Release](https://github.com/openOODA-tools/oogrep/releases):
 
 ```bash
-# Debian, Ubuntu (APT)
-sudo apt install ./oogrep_0.3.0-1_amd64.deb
-
 # Fedora, RHEL, Rocky, Alma (DNF)
-sudo dnf install ./oogrep-0.3.0-1.*.rpm
+sudo dnf install https://github.com/openOODA-tools/oogrep/releases/download/v0.3.1/oogrep-0.3.1-1.x86_64.rpm
+
+# Debian, Ubuntu (APT / DEB)
+curl -fsSLO https://github.com/openOODA-tools/oogrep/releases/download/v0.3.1/oogrep_0.3.1-1_amd64.deb
+sudo apt install ./oogrep_0.3.1-1_amd64.deb
+
+# Arch Linux, Manjaro, EndeavourOS (PKGBUILD)
+curl -fsSLO https://github.com/openOODA-tools/oogrep/releases/download/v0.3.1/PKGBUILD
+makepkg -si
 ```
 
-Or install with package manager flags via the installer:
+Or install with package manager flags directly via the web installer:
 ```bash
+# Fedora / RHEL (DNF)
+curl -fsSL https://openooda-tools.github.io/oogrep/install.sh | bash -s -- --dnf
+
 # Debian / Ubuntu (APT)
 curl -fsSL https://openooda-tools.github.io/oogrep/install.sh | bash -s -- --apt
 
-# Fedora / RHEL (DNF)
-curl -fsSL https://openooda-tools.github.io/oogrep/install.sh | bash -s -- --dnf
+# Arch Linux (PKGBUILD)
+curl -fsSL https://openooda-tools.github.io/oogrep/install.sh | bash -s -- --pkgbuild
 ```
 
 ### Options
 ```bash
+# Custom installation directory
+curl -fsSL https://openooda-tools.github.io/oogrep/install.sh | bash -s -- --prefix ~/.local/bin
+
 # Preview actions without modifying the host
 curl -fsSL https://openooda-tools.github.io/oogrep/install.sh | bash -s -- --dry-run
 
@@ -144,7 +155,7 @@ oogrep --json "pub fn main" src/
 ```json
 {
   "tool": "oogrep",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "pattern": "pub fn main",
   "mode": "lines",
   "matches": [
