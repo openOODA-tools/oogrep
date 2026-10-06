@@ -2,40 +2,14 @@
 //
 // Logline: Unified entry point for candidate discovery, glob admission, and size admission.
 //
-// Setup: Re-exports the walk domain. Threading of FsReadCap stays with the caller.
+// Setup: Pure shim re-exporting candidate discovery and admission pipelines.
 //
 // Beats:
-//   1. Expose pruning recursive collection with depth and ignore policy.
-//   2. Bind glob include filtering and size budget admission.
-//   3. Offer a single admission pipeline over a raw candidate list.
+//   1. Re-export candidate collection and glob filtering.
+//   2. Re-export size filtering and unified admission.
 
 import "collect_candidates.oo";
 import "filter_by_glob.oo";
 import "filter_by_kind.oo";
 import "gitignore.oo";
-
-pub fn walk_collect(fs: &FsReadCap, root: String, max_depth: Int, respect_ignore: Bool) -> Admitted {
-    return collect_candidates(fs, root, max_depth, respect_ignore);
-}
-
-pub fn walk_filter_glob(candidates: List[String], pattern: String) -> List[String] {
-    return filter_by_glob(candidates, pattern);
-}
-
-pub fn walk_filter_kind(fs: &FsReadCap, candidates: List[String]) -> List[String] {
-    return filter_by_kind(fs, candidates);
-}
-
-pub fn walk_admit(fs: &FsReadCap, root: String, max_depth: Int, respect_ignore: Bool, glob: String) -> Admitted {
-    let found: Admitted = collect_candidates(fs, root, max_depth, respect_ignore);
-    let sized: List[String] = filter_by_kind(fs, found.paths);
-    return Admitted { paths: filter_by_glob(sized, glob), skipped: found.skipped };
-}
-
-pub fn walk_size_budget() -> Int {
-    return kind_size_budget();
-}
-
-pub fn walk_anchor_probe() -> String {
-    return collect_ignores();
-}
+import "walk_pipeline.oo";

@@ -5,14 +5,13 @@
 // Setup: Pure. Honours the caller's line-number and color policy. Never reads the filesystem.
 //
 // Beats:
-//   1. Compose the path, line number, and column prefix.
-//   2. Split the line around the match span and paint the match when color is enabled.
-//   3. Return the assembled record without a trailing newline.
+//   1. Expose semantic color codes for match hit, path, line number, and column.
+//   2. Compose the path, line number, and column prefix with token styling.
+//   3. Split the line around the match span and paint the match when color is enabled.
+//   4. Return the assembled record without a trailing newline.
 
 import "match/scan_lines.oo";
 
-// The language does not expand \033 inside a string literal, so the escape byte
-// is built from its numeric code the way std palette does.
 fn esc() -> String {
     return bytes_to_str(bytes_push(bytes_new(), 27));
 }
@@ -21,15 +20,20 @@ fn paint(s: String, code: String) -> String {
     return esc() + "[" + code + "m" + s + esc() + "[0m";
 }
 
+pub fn match_color_hit() -> String { return "1;31"; }
+pub fn match_color_path() -> String { return "1;35"; }
+pub fn match_color_line_num() -> String { return "1;32"; }
+pub fn match_color_col_num() -> String { return "1;33"; }
+
 pub fn render_hit(h: Hit, show_lines: Bool, color: Bool, show_column: Bool, show_filename: Bool) -> String {
     let mut prefix: String = "";
     if show_filename {
-        prefix = if color { paint(h.path, "1;35") } else { h.path };
+        prefix = if color { paint(h.path, match_color_path()) } else { h.path };
     }
 
     if show_lines {
         let ln: String = h.line_no.to_string();
-        let ln_p: String = if color { paint(ln, "1;32") } else { ln };
+        let ln_p: String = if color { paint(ln, match_color_line_num()) } else { ln };
         let num_sep: String = if h.context { "-" } else { ":" };
         if chars_len(prefix) > 0 {
             prefix = prefix + num_sep;
@@ -37,7 +41,7 @@ pub fn render_hit(h: Hit, show_lines: Bool, color: Bool, show_column: Bool, show
         prefix = prefix + ln_p;
         if show_column && h.col > 0 {
             let c: String = h.col.to_string();
-            let c_p: String = if color { paint(c, "1;33") } else { c };
+            let c_p: String = if color { paint(c, match_color_col_num()) } else { c };
             prefix = prefix + ":" + c_p;
         }
     }
@@ -50,10 +54,6 @@ pub fn render_hit(h: Hit, show_lines: Bool, color: Bool, show_column: Bool, show
 
     let body: String = h.line_text;
     let n: Int = chars_len(body);
-    // locate_span reports a byte offset from the regex engine while str_slice
-    // is char-indexed, so the span is clamped to the line rather than trusted.
-    // A misplaced highlight is cosmetic; an out-of-range slice would corrupt
-    // the record, which is not acceptable.
     let mut s0: Int = h.col - 1;
     if s0 < 0 { s0 = 0; }
     if s0 > n { s0 = n; }
@@ -63,5 +63,5 @@ pub fn render_hit(h: Hit, show_lines: Bool, color: Bool, show_column: Bool, show
     let left: String = str_slice(body, 0, s0);
     let mid: String = str_slice(body, s0, e0);
     let right: String = str_slice(body, e0, n);
-    return head + left + paint(mid, "1;31") + right;
+    return head + left + paint(mid, match_color_hit()) + right;
 }

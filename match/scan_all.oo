@@ -1,0 +1,46 @@
+// # Multi-File Scanner - Traversal Scan Driver
+//
+// Logline: Orchestrates file reading and regex pattern matching across multiple path targets.
+//
+// Setup: Requires FsReadCap. Dispatches to line and context scanners.
+//
+// Beats:
+//   1. Scan single file or buffer dispatching to context or flat line scanners.
+//   2. Scan across multiple paths accumulating ordered Hit records.
+//   3. Handle standard input and bounded in-memory text buffers.
+
+import "scan_lines.oo";
+import "scan_context.oo";
+import "search_opts.oo";
+
+pub fn match_scan_file(fs: &FsReadCap, path: String, re: Regex, o: SearchOpts) -> List[Hit] {
+    if o.ctx_before > 0 || o.ctx_after > 0 {
+        return scan_lines_context(fs, path, re, o);
+    }
+    return scan_lines(fs, path, re, o);
+}
+
+pub fn match_scan_all(fs: &FsReadCap, paths: List[String], re: Regex, o: SearchOpts) -> List[Hit] {
+    let mut all: List[Hit] = list_new();
+    let n: Int = list_len(paths);
+    let mut i: Int = 0;
+    while i < n {
+        let p: String = list_get(paths, i);
+        let file_hits: List[Hit] = match_scan_file(fs, p, re, o);
+        let m: Int = list_len(file_hits);
+        let mut j: Int = 0;
+        while j < m {
+            all = list_push(all, list_get(file_hits, j));
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+    return all;
+}
+
+pub fn match_scan_text(path: String, body: String, re: Regex, o: SearchOpts) -> List[Hit] {
+    if o.ctx_before > 0 || o.ctx_after > 0 {
+        return scan_text_context(path, body, re, o);
+    }
+    return scan_text(path, body, re, o);
+}

@@ -2,66 +2,16 @@
 //
 // Logline: Unified entry point for pattern compilation, file scanning, span location, and hit ranking.
 //
-// Setup: Re-exports the match domain. FsReadCap threading stays with the caller.
+// Setup: Pure shim re-exporting the match domain.
 //
 // Beats:
-//   1. Expose pattern compilation under the requested case policy.
-//   2. Bind single-file scanning that yields ordered Hit records.
-//   3. Offer a multi-file scan that concatenates hits in traversal order.
+//   1. Re-export pattern compilation and span location.
+//   2. Re-export scanning engines and hit ranking.
 
 import "compile_pattern.oo";
 import "locate_span.oo";
 import "scan_lines.oo";
 import "scan_context.oo";
+import "scan_all.oo";
 import "rank_hits.oo";
 import "search_opts.oo";
-
-pub fn match_compile(pattern: String, ignore_case: Bool) -> Result[Regex, String] {
-    return compile_pattern(pattern, ignore_case);
-}
-
-pub fn match_scan_file(fs: &FsReadCap, path: String, re: Regex, o: SearchOpts) -> List[Hit] {
-    if o.ctx_before > 0 || o.ctx_after > 0 {
-        return scan_lines_context(fs, path, re, o);
-    }
-    return scan_lines(fs, path, re, o);
-}
-
-pub fn match_scan_all(fs: &FsReadCap, paths: List[String], re: Regex, o: SearchOpts) -> List[Hit] {
-    // One local accumulator for the whole scan. Rebuilding the list per file
-    // through a concat helper faults on trees with thousands of candidates.
-    let mut all: List[Hit] = list_new();
-    let n: Int = list_len(paths);
-    let mut i: Int = 0;
-    while i < n {
-        let p: String = list_get(paths, i);
-        let file_hits: List[Hit] = match_scan_file(fs, p, re, o);
-        let m: Int = list_len(file_hits);
-        let mut j: Int = 0;
-        while j < m {
-            all = list_push(all, list_get(file_hits, j));
-            j = j + 1;
-        }
-        i = i + 1;
-    }
-    return all;
-}
-
-pub fn match_scan_text(path: String, body: String, re: Regex, o: SearchOpts) -> List[Hit] {
-    if o.ctx_before > 0 || o.ctx_after > 0 {
-        return scan_text_context(path, body, re, o);
-    }
-    return scan_text(path, body, re, o);
-}
-
-pub fn match_rank(hits: List[Hit], budget: Int, scanned: List[String]) -> RankedHits {
-    return rank_hits(hits, budget, scanned);
-}
-
-pub fn match_locate(re: Regex, line: String, pattern: String, ignore_case: Bool) -> LineSpan {
-    return locate_span(re, line, pattern, ignore_case);
-}
-
-pub fn match_anchor_probe() -> String {
-    return "match-active";
-}

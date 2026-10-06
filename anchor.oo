@@ -1,30 +1,14 @@
-// # oogrep Anchor - Root Composition Surface
+// # oogrep Project Anchor - Sovereign Pattern Search
 //
-// Logline: Unified entry point re-exporting the search policy, pipeline, and integer admission pages.
+// Logline: Names the four oogrep domains and re-exports root subsystem anchors.
 //
-// Setup: Re-exports the root composition surface. No domain logic lives on this page.
+// Setup: Pure shim importing subsystem anchors.
 //
 // Beats:
-//   1. Expose the shared search policy record and its defaults.
-//   2. Bind the single end to end search pipeline used by both surfaces.
-//   3. Offer integer admission to flag and argument parsers.
+//   1. Re-export walk and match subsystems.
+//   2. Re-export render and mcp subsystems.
 
-import "parse_decimal.oo";
-import "search_opts.oo";
-import "search.oo";
-
-pub fn anchor_default_opts() -> SearchOpts {
-    return opts_defaults();
-}
-
-pub fn anchor_run(fs: &FsReadCap, o: SearchOpts) -> SearchOutcome {
-    return run_search(fs, o);
-}
-
-pub fn anchor_parse_decimal(raw: String, fallback: Int) -> Int {
-    return parse_decimal(raw, fallback);
-}
-
-pub fn anchor_probe() -> String {
-    return "oogrep-0.3.0";
-}
+import "walk/anchor.oo";
+import "match/anchor.oo";
+import "render/anchor.oo";
+import "mcp/anchor.oo";

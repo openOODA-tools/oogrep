@@ -2,52 +2,14 @@
 //
 // Logline: Unified entry point for hit records, summary tallies, and diagnostic reporting.
 //
-// Setup: Re-exports the render domain. Presentation only; this domain never reads the filesystem.
+// Setup: Pure shim re-exporting the render domain.
 //
 // Beats:
-//   1. Expose single hit rendering under line-number and color policy.
-//   2. Bind tally and truncation reporting for the summary modes.
-//   3. Offer help, version, and error text for the entry point.
+//   1. Re-export hit rendering and summary reporting.
+//   2. Re-export diagnostic and error envelopes.
 
 import "render_match.oo";
+import "render_theme.oo";
 import "render_summary.oo";
 import "render_errors.oo";
 import "render_json.oo";
-import "match/scan_lines.oo";
-import "match/rank_hits.oo";
-
-pub fn render_line(h: Hit, show_lines: Bool, color: Bool, show_column: Bool, show_filename: Bool) -> String {
-    return render_hit(h, show_lines, color, show_column, show_filename);
-}
-
-pub fn render_tally_lines(tallies: List[FileTally], with_counts: Bool, show_filename: Bool) -> String {
-    return render_tallies(tallies, with_counts, show_filename);
-}
-
-pub fn render_clipped(dropped: Int) -> String {
-    return render_truncation(dropped);
-}
-
-pub fn render_json_envelope(pattern: String, mode: String, hits: List[Hit], tallies: List[FileTally], scanned: Int, matched: Int, total: Int, dropped: Int, skipped: Int) -> String {
-    return json_envelope(pattern, mode, hits, tallies, scanned, matched, total, dropped, skipped);
-}
-
-pub fn render_diag(msg: String) -> String {
-    return render_error(msg);
-}
-
-pub fn render_usage(msg: String) -> String {
-    return render_usage_error(msg);
-}
-
-pub fn render_help_text() -> String {
-    return render_help();
-}
-
-pub fn render_version_text() -> String {
-    return render_version();
-}
-
-pub fn render_anchor_probe() -> String {
-    return "render-active";
-}

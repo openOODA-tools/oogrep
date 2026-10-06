@@ -11,10 +11,10 @@
 
 import "json_field.oo";
 
-fn protocol_version() -> String { return "2024-11-05"; }
+fn mcp_proto_version() -> String { return "2024-11-05"; }
 
 pub fn build_initialize(id: String) -> String {
-    let inner: String = "{\"protocolVersion\":\"" + protocol_version() + "\",\"capabilities\":{\"tools\":{}},\"serverInfo\":{\"name\":\"oogrep\",\"version\":\"0.3.0\"}}";
+    let inner: String = "{\"protocolVersion\":\"" + mcp_proto_version() + "\",\"capabilities\":{\"tools\":{}},\"serverInfo\":{\"name\":\"oogrep\",\"version\":\"0.3.0\"}}";
     return "{\"jsonrpc\":\"2.0\",\"id\":" + id + ",\"result\":" + inner + "}";
 }
 
@@ -47,5 +47,5 @@ pub fn build_error(id: String, code: Int, msg: String) -> String {
 }
 
 pub fn schema_protocol_version() -> String {
-    return protocol_version();
+    return mcp_proto_version();
 }

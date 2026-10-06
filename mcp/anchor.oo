@@ -1,43 +1,14 @@
-// # MCP Subsystem Anchor - Agent Transport
+// # MCP Subsystem Anchor - Stdio Server And JSON-RPC Surface
 //
-// Logline: Unified entry point for the MCP stdio transport, schema emission, and tool dispatch.
+// Logline: Presents the search engine as an MCP stdio server speaking JSON-RPC 2.0.
 //
-// Setup: Re-exports the mcp domain. The transport owns no search logic; it delegates to run_search.
+// Setup: Pure shim re-exporting the MCP server implementation.
 //
 // Beats:
-//   1. Expose the stdio serve loop to the entry point.
-//   2. Bind request dispatch and protocol schema emission.
-//   3. Offer the field accessors the transport needs for frame parsing.
+//   1. Re-export schema definitions and tool call router.
+//   2. Re-export stdio transport loop.
 
+import "dispatch.oo";
 import "json_field.oo";
 import "schema.oo";
-import "dispatch.oo";
 import "serve.oo";
-
-pub fn mcp_run(fs: &FsReadCap) -> Int {
-    return mcp_serve(fs);
-}
-
-pub fn mcp_route(fs: &FsReadCap, req: String, initialized: Bool) -> String {
-    return mcp_dispatch(fs, req, initialized);
-}
-
-pub fn mcp_tools_list(id: String) -> String {
-    return build_tools_list(id);
-}
-
-pub fn mcp_initialize(id: String) -> String {
-    return build_initialize(id);
-}
-
-pub fn mcp_error(id: String, code: Int, msg: String) -> String {
-    return build_error(id, code, msg);
-}
-
-pub fn mcp_field_string(json: String, key: String) -> String {
-    return json_field_string(json, key);
-}
-
-pub fn mcp_anchor_probe() -> String {
-    return schema_protocol_version();
-}

@@ -14,9 +14,15 @@
 import "std/fs/os/fs.oo";
 import "std/core/text/regex.oo";
 import "search_opts.oo";
-import "walk/anchor.oo";
-import "match/anchor.oo";
-import "render/anchor.oo";
+import "walk/filter_by_kind.oo";
+import "walk/walk_pipeline.oo";
+import "match/compile_pattern.oo";
+import "match/scan_lines.oo";
+import "match/scan_all.oo";
+import "match/rank_hits.oo";
+import "render/render_match.oo";
+import "render/render_summary.oo";
+import "render/render_json.oo";
 
 pub type SearchOutcome = struct {
     ok: Bool,
@@ -50,7 +56,7 @@ fn drain_stdin(fs: &FsReadCap) -> String {
     let mut buf: String = "";
     let mut total_len: Int = 0;
     let mut running: Bool = true;
-    let limit: Int = walk_size_budget();
+    let limit: Int = kind_size_budget();
     while running {
         let r: Result[String, String] = oo_read_stdin_chunk(fs, stdin_poll_ms());
         if !r.is_ok() {
@@ -79,7 +85,7 @@ fn drain_stdin(fs: &FsReadCap) -> String {
 }
 
 pub fn run_search(fs: &FsReadCap, o: SearchOpts) -> SearchOutcome {
-    let cr: Result[Regex, String] = match_compile(o.pattern, o.ignore_case);
+    let cr: Result[Regex, String] = compile_pattern(o.pattern, o.ignore_case);
     if cr.is_err() {
         let m: String = match cr { Ok(_) => "compile failed", Err(e) => e };
         return failure("invalid pattern: " + m);
@@ -130,7 +136,7 @@ pub fn run_search(fs: &FsReadCap, o: SearchOpts) -> SearchOutcome {
     // applied to them. A clipped count is a lie; a clipped line list is honest.
     let summary_mode: Bool = o.count_mode || o.files_only;
     let effective_budget: Int = if summary_mode { 0 } else { o.budget };
-    let ranked: RankedHits = match_rank(hits, effective_budget, scanned_paths);
+    let ranked: RankedHits = rank_hits(hits, effective_budget, scanned_paths);
 
     let mut total: Int = 0;
     let tn: Int = list_len(ranked.tallies);
@@ -146,9 +152,9 @@ pub fn run_search(fs: &FsReadCap, o: SearchOpts) -> SearchOutcome {
         let mut mode: String = "lines";
         if o.count_mode { mode = "count"; }
         if o.files_only { mode = "files"; }
-        body = render_json_envelope(o.pattern, mode, ranked.hits, ranked.tallies, scanned, ranked.matched_files, total, ranked.dropped, skipped_total);
+        body = json_envelope(o.pattern, mode, ranked.hits, ranked.tallies, scanned, ranked.matched_files, total, ranked.dropped, skipped_total);
     } else if o.count_mode || o.files_only {
-        body = render_tally_lines(ranked.tallies, o.count_mode, show_fn);
+        body = render_tallies(ranked.tallies, o.count_mode, show_fn);
     } else {
         let n: Int = list_len(ranked.hits);
         let mut i: Int = 0;
@@ -160,14 +166,14 @@ pub fn run_search(fs: &FsReadCap, o: SearchOpts) -> SearchOutcome {
             if ctx_on && h.path == prev_path && prev_line >= 0 && h.line_no > prev_line + 1 {
                 body = body + "--\n";
             }
-            body = body + render_line(h, o.show_lines, o.color, o.show_column, show_fn) + "\n";
+            body = body + render_hit(h, o.show_lines, o.color, o.show_column, show_fn) + "\n";
             prev_path = h.path;
             prev_line = h.line_no;
             i = i + 1;
         }
     }
     if ranked.dropped > 0 && !o.json_mode {
-        body = body + render_clipped(ranked.dropped);
+        body = body + render_truncation(ranked.dropped);
     }
     if o.quiet {
         body = "";

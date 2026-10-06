@@ -12,8 +12,8 @@
 import "parse_decimal.oo";
 import "search_opts.oo";
 import "search.oo";
-import "render/anchor.oo";
-import "mcp/anchor.oo";
+import "render/render_errors.oo";
+import "mcp/serve.oo";
 
 fn has_flag(args: List[String], short: String, long: String) -> Bool {
     let n: Int = list_len(args);
@@ -127,10 +127,10 @@ fn parse_args(args: List[String]) -> Result[SearchOpts, String] {
             budget = parse_decimal(v2, default_budget());
             i = i + 2;
         } else if a == "-h" || a == "--help" {
-            print(render_help_text());
+            print(render_help());
             return Err("__help");
         } else if a == "-V" || a == "--version" {
-            print(render_version_text());
+            print(render_version());
             return Err("__version");
         } else if str_starts_with(a, "-") && chars_len(a) > 1 {
             return Err("unknown flag: " + a);
@@ -180,7 +180,7 @@ fn parse_args(args: List[String]) -> Result[SearchOpts, String] {
 // status. oogrep never spawns a process and never uses it for anything else.
 pub fn main(fs: &FsReadCap, proc_cap: &ProcessCap, args: List[String]) -> Result[Int, String] {
     if has_flag(args, "", "--mcp") {
-        let mcp_rc: Int = mcp_run(fs);
+        let mcp_rc: Int = mcp_serve(fs);
         if mcp_rc != 0 { process_exit(mcp_rc); }
         return Ok(mcp_rc);
     }
@@ -189,7 +189,7 @@ pub fn main(fs: &FsReadCap, proc_cap: &ProcessCap, args: List[String]) -> Result
     if parsed.is_err() {
         let m: String = match parsed { Ok(_) => "", Err(e) => e };
         if m == "__help" || m == "__version" { return Ok(0); }
-        print(render_usage(m));
+        print(render_usage_error(m));
         process_exit(2);
         return Ok(2);
     }
@@ -198,7 +198,7 @@ pub fn main(fs: &FsReadCap, proc_cap: &ProcessCap, args: List[String]) -> Result
 
     let out: SearchOutcome = run_search(fs, o);
     if !out.ok {
-        print(render_diag(out.err));
+        print(render_error(out.err));
         process_exit(2);
         return Ok(2);
     }

@@ -15,7 +15,7 @@ import "schema.oo";
 import "search.oo";
 import "search_opts.oo";
 
-fn default_max_chars() -> Int { return 4000; }
+fn mcp_def_max_chars() -> Int { return 4000; }
 
 fn max_chars_cap() -> Int { return 65536; }
 
@@ -28,7 +28,7 @@ fn arg_bool(args: String, key: String) -> Bool {
 }
 
 fn clamp_max_chars(n: Int) -> Int {
-    if n <= 0 { return default_max_chars(); }
+    if n <= 0 { return mcp_def_max_chars(); }
     if n > max_chars_cap() { return max_chars_cap(); }
     return n;
 }
@@ -93,7 +93,7 @@ fn call_search(fs: &FsReadCap, id: String, req: String) -> String {
         return build_error(id, -32602, out.err);
     }
 
-    let cap: Int = clamp_max_chars(arg_int(args, "max_chars", default_max_chars()));
+    let cap: Int = clamp_max_chars(arg_int(args, "max_chars", mcp_def_max_chars()));
     let text: String = out.text;
     let mut clipped: Bool = false;
     let body: String = if chars_len(text) > cap {
@@ -126,5 +126,5 @@ pub fn mcp_dispatch(fs: &FsReadCap, req: String, initialized: Bool) -> String {
 }
 
 pub fn dispatch_default_max_chars() -> Int {
-    return default_max_chars();
+    return mcp_def_max_chars();
 }
