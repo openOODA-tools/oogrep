@@ -9,8 +9,10 @@ url="https://github.com/openOODA-tools/oogrep"
 license=('MIT')
 provides=("${_pkgname}=${pkgver}")
 conflicts=("${_pkgname}")
-source=("${_pkgname}-${pkgver}-linux-x86_64::https://github.com/openOODA-tools/oogrep/releases/download/v${pkgver}/oogrep-linux-x86_64")
-sha256sums=('SKIP')
+source=("${_pkgname}-${pkgver}-linux-x86_64::https://github.com/openOODA-tools/oogrep/releases/download/v${pkgver}/oogrep-linux-x86_64"
+        "uninstall.sh::https://raw.githubusercontent.com/openOODA-tools/${_pkgname}/v${pkgver}/uninstall.sh")
+sha256sums=('SKIP'
+            'SKIP')
 
 package() {
     install -Dm755 "${srcdir}/${_pkgname}-${pkgver}-linux-x86_64" "${pkgdir}/usr/bin/${_pkgname}"
