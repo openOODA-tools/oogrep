@@ -56,5 +56,5 @@ pub fn render_help() -> String {
 }
 
 pub fn render_version() -> String {
-    return "oogrep 0.3.1\n";
+    return "oogrep 0.3.2\n";
 }

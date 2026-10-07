@@ -1,3 +1,9 @@
+oogrep (0.3.2-1) stable; urgency=low
+
+  * Clean uninstaller, oote theme integration, and packaging standardization.
+
+ -- openOODA-tools <ops@openooda.org>  Tue, 06 Oct 2026 18:00:00 -1000
+
 oogrep (0.3.1-1) stable; urgency=low
 
   * Arch Linux PKGBUILD support and expanded package installation methods.

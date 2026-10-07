@@ -74,8 +74,8 @@ file-law:
 		fi; \
 	done; \
 	for f in $$(find . -name "*.sh" -not -path "./.git/*" -not -path "./.ooda-cache/*" -not -path "./.blackbox/*" 2>/dev/null); do \
-		if [ "$$f" != "./install.sh" ]; then \
-			echo "VIOLATION: .sh forbidden outside install.sh: $$f"; violations=$$((violations+1)); \
+		if [ "$$f" != "./install.sh" ] && [ "$$f" != "./uninstall.sh" ]; then \
+			echo "VIOLATION: .sh forbidden outside install.sh and uninstall.sh: $$f"; violations=$$((violations+1)); \
 		fi; \
 	done; \
 	for f in $$(find . -name "*.md" -not -path "./.git/*" -not -path "./.ooda-cache/*" -not -path "./.blackbox/*" 2>/dev/null); do \
@@ -320,13 +320,15 @@ uninstall:
 	@./install.sh --uninstall --yes > /dev/null
 	@echo "uninstalled oogrep"
 
-VERSION ?= 0.3.1
+VERSION ?= 0.3.2
 
 package-deb: $(BIN)
 	@mkdir -p dist/deb-root/DEBIAN dist/deb-root/usr/bin
 	@sed "s/^Version:.*/Version: $(VERSION)-1/" packaging/debian/control.binary > dist/deb-root/DEBIAN/control
 	@cp $(BIN) dist/deb-root/usr/bin/oogrep
 	@chmod 0755 dist/deb-root/usr/bin/oogrep
+	@cp uninstall.sh dist/deb-root/usr/bin/oogrep-uninstall
+	@chmod 0755 dist/deb-root/usr/bin/oogrep-uninstall
 	@dpkg-deb --build --root-owner-group dist/deb-root dist/oogrep_$(VERSION)-1_amd64.deb
 	@rm -rf dist/deb-root
 	@echo "built dist/oogrep_$(VERSION)-1_amd64.deb"
@@ -334,16 +336,18 @@ package-deb: $(BIN)
 package-rpm: $(BIN)
 	@mkdir -p ~/rpmbuild/SOURCES ~/rpmbuild/SPECS ~/rpmbuild/RPMS
 	@cp $(BIN) ~/rpmbuild/SOURCES/oogrep-linux-x86_64
+	@cp uninstall.sh ~/rpmbuild/SOURCES/uninstall.sh
 	@sed "s/^Version:.*/Version: $(VERSION)/" packaging/oogrep.spec > ~/rpmbuild/SPECS/oogrep.spec
 	@rpmbuild -bb ~/rpmbuild/SPECS/oogrep.spec
 	@cp ~/rpmbuild/RPMS/x86_64/oogrep-$(VERSION)*.rpm dist/
 	@echo "built dist RPM package"
 
 package-arch: $(BIN)
-	@mkdir -p dist
+	@mkdir -p dist packaging/arch
 	@sum=$$(sha256sum $(BIN) | awk '{print $$1}'); \
-	sed -e "s/^pkgver=.*/pkgver=$(VERSION)/" -e "s/^sha256sums=.*/sha256sums=('$$sum')/" packaging/PKGBUILD > dist/PKGBUILD
-	@echo "built dist/PKGBUILD"
+	sed -e "s/^pkgver=.*/pkgver=$(VERSION)/" -e "s/^sha256sums=.*/sha256sums=('$$sum')/" packaging/PKGBUILD > dist/PKGBUILD; \
+	cp packaging/PKGBUILD packaging/arch/PKGBUILD
+	@echo "built dist/PKGBUILD and packaging/arch/PKGBUILD"
 
 package: package-deb package-rpm package-arch
 

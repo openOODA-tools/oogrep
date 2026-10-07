@@ -1,26 +1,31 @@
 Name:           oogrep
-Version:        0.3.1
+Version:        0.3.2
 Release:        1%{?dist}
 Summary:        Capability-bounded recursive regex search
 License:        ASL 2.0
 URL:            https://github.com/openOODA-tools/oogrep
 Source0:        oogrep-linux-x86_64
+Source1:        uninstall.sh
 BuildArch:      x86_64
 Requires:       glibc
 
 %description
 oogrep is a drop-in grep replacement written in openOODA, with
-machine-readable JSON output and a first-class MCP surface for
-agent callers.
+machine-readable JSON output, clean uninstaller, and a first-class
+MCP surface for agent callers.
 
 %install
 mkdir -p %{buildroot}/usr/bin
 install -m 0755 %{SOURCE0} %{buildroot}/usr/bin/oogrep
+install -m 0755 %{SOURCE1} %{buildroot}/usr/bin/oogrep-uninstall
 
 %files
 /usr/bin/oogrep
+/usr/bin/oogrep-uninstall
 
 %changelog
+* Tue Oct 06 2026 openOODA-tools <ops@openooda.org> - 0.3.2-1
+- Align AGENTS.md, companion uninstaller (oogrep-uninstall), oote theme integration, and packaging
 * Tue Oct 06 2026 openOODA-tools <ops@openooda.org> - 0.3.1-1
 - Arch Linux PKGBUILD support and expanded package installation methods
 * Mon Oct 05 2026 openOODA-tools <ops@openooda.org> - 0.3.0-1

@@ -23,14 +23,14 @@ Prebuilt packages and package definitions are attached to every [GitHub Release]
 
 ```bash
 # Fedora, RHEL, Rocky, Alma (DNF)
-sudo dnf install https://github.com/openOODA-tools/oogrep/releases/download/v0.3.1/oogrep-0.3.1-1.x86_64.rpm
+sudo dnf install https://github.com/openOODA-tools/oogrep/releases/download/v0.3.2/oogrep-0.3.2-1.x86_64.rpm
 
 # Debian, Ubuntu (APT / DEB)
-curl -fsSLO https://github.com/openOODA-tools/oogrep/releases/download/v0.3.1/oogrep_0.3.1-1_amd64.deb
-sudo apt install ./oogrep_0.3.1-1_amd64.deb
+curl -fsSLO https://github.com/openOODA-tools/oogrep/releases/download/v0.3.2/oogrep_0.3.2-1_amd64.deb
+sudo apt install ./oogrep_0.3.2-1_amd64.deb
 
 # Arch Linux, Manjaro, EndeavourOS (PKGBUILD)
-curl -fsSLO https://github.com/openOODA-tools/oogrep/releases/download/v0.3.1/PKGBUILD
+curl -fsSLO https://github.com/openOODA-tools/oogrep/releases/download/v0.3.2/PKGBUILD
 makepkg -si
 ```
 
@@ -170,7 +170,7 @@ oogrep --json "pub fn main" src/
 ```json
 {
   "tool": "oogrep",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "pattern": "pub fn main",
   "mode": "lines",
   "matches": [

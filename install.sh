@@ -22,8 +22,8 @@ set -eu
 REPO="openOODA-tools/oogrep"
 GITHUB_URL="https://github.com/${REPO}"
 CANONICAL_URL="https://openooda-tools.github.io/oogrep"
-VERSION_PIN="v0.3.1"
-RAW_VERSION="0.3.1"
+VERSION_PIN="v0.3.2"
+RAW_VERSION="0.3.2"
 
 # --- Styling & Human Interface Standard ---------------------------------------
 if [ -t 1 ] && [ "${NO_COLOR:-}" = "" ] && [ "${TERM:-dumb}" != "dumb" ]; then

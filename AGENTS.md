@@ -22,21 +22,11 @@ A **page** is one committed `.oo` or `.oot` file. Every page holds one idea, fit
 - **State pages name what they own**: `search_opts.oo`, `hit.oo`.
 - **Boundary pages speak trust verbs**: `compile_pattern.oo`, `admit_candidate.oo`, `enforce_scope.oo`.
 
-### The Three Domains
-Pages group into functional subdirectories, never a flat pile:
-
-- **`walk/`** — produce and filter the candidate file set. Owns traversal, glob matching, and file-kind admission. Knows nothing about regexes.
-- **`match/`** — turn a candidate path plus a compiled pattern into ranked `Hit` records. Knows nothing about color or terminal state.
-- **`render/`** — turn `Hit` records into terminal output. Owns color, summary, and error presentation. Never re-reads the filesystem.
-- **`mcp/`** — expose the same search over MCP stdio for agent callers. Thin transport only; it delegates to `walk/`, `match/`, and `render/` and owns no search logic of its own.
-
-A page may not reach across domains to duplicate a neighbour's work. If `render/` needs a field, `match/` provides it on the record.
-
 ---
 
 ## 2. The 4-Element Academy Header (Mandatory on Every Page)
 
-Every committed `.oo` file must begin with the standard 4-element Academy docstring:
+Every committed `.oo` file must begin with the standard 4-element Academy docstring within its first 7 lines:
 
 ```oo
 // # Component Name - Subtitle
@@ -52,59 +42,69 @@ Every committed `.oo` file must begin with the standard 4-element Academy docstr
 ```
 
 - **ASD-STE100 Compliance**: Clear, concise English. No filler or ambiguous verbs.
-- **Imports**: All imports must be relative string literals (e.g. `import "std/fs/os/fs.oo";`). Never use `::` namespaces.
+- **Imports**: All imports must be relative string literals (e.g. `import "render/render_match.oo";`). Never use `::` namespaces.
 
 ---
 
-## 3. openOODA Capability & Security Discipline
+## 3. openOODA Capability & Zero-Trust Discipline
 
-`oogrep` operates strictly on the Object-Capability (OCap) security model. It is an agent-facing tool, so this section is load-bearing rather than ceremonial.
+`oogrep` operates strictly on the Object-Capability (OCap) security model:
 
 ### Unforgeable Capability Tokens
 - **Zero Ambient Authority**: `oogrep` never reads a file without an explicit `&FsReadCap` threaded from `main`. It holds no `&FsWriteCap` and never opens a network socket.
-- **Read-Only by Construction**: A search tool has no reason to write or open network. The absence of `&FsWriteCap` and `&NetCap` in `main` is the enforcement, not a convention.
-- **The One Process Exception**: `main` declares `&ProcessCap` solely to raise a non-zero exit status, because the runtime does not derive the process status from main's return value and `process_exit` is classified under `ProcessCap`. **`oogrep` never spawns a process.** A page that spawns anything violates this law, and the capability is present only so the exit code law is not traded for a stderr warning on every no-match search.
-- **Path Scope**: Every candidate path is admitted under the caller's read scope. The MCP layer must refuse any request whose root escapes the attested `path_prefix` of its attenuated token.
-
-### Subprocess Safety
-- **Never invoke `/bin/sh -c` or `/bin/bash -c`**: `oogrep` spawns nothing. This is stricter than the general openOODA rule and is not negotiable — a search tool that shells out has already failed.
-- **No `process_exec`**: The `std/fs/process/process.oo` `process_exec` wrapper is a `sh -c` convenience and is banned in this repo. Direct `sys_exec` with an explicit argv array is the only sanctioned form, should a future page need it.
+- **Read-Only by Construction**: A search tool has no reason to write or open network. The absence of `&FsWriteCap` and `&NetCap` in `main` is an architectural guarantee.
+- **Subprocess Safety**: Never invoke `/bin/sh -c` or `/bin/bash -c`. Direct binary execution must use explicit argv arrays via `ProcessCap`. Clean environment variables of child processes.
+- **Path Scope & Binary Defense**: Reject binary files containing NUL bytes in their initial probe window. Prevent corrupted output from reaching downstream pipes.
 
 ---
 
-## 4. Search Correctness & Exit Code Invariants
+## 4. Unified Theming with `oote`
 
-`oogrep` is a drop-in filter. Its contract with pipes is sacred.
+All openOODA tools synchronize visual presentation through `oote`:
 
-1. **Exit Code Law**: `0` when at least one match is found, `1` when the search completes with no match, `2` on usage or I/O error. This is the `grep` convention and scripts depend on it. Never return `0` from a failed search.
-2. **Binary Admission**: A candidate containing a NUL byte in its first probe window is rejected, not printed. Printing binary garbage into a pipeline corrupts downstream tools.
-3. **Line Orientation**: One output record per matching line, never per match. A line matching five times is one line, with the first match located.
-4. **Deterministic Order**: Within a file, lines ascend. Across files, the order is the traversal order. A search run twice over an unchanged tree produces byte-identical output.
+- **Theme Resolver**: `oogrep` styles match highlights (`match_hit`, `match_path`, `match_line_num`, `match_col_num`) directly from `~/.openooda/theme.oot` or respects `OODA_THEME`, `OODA_MODE`, and `OODA_BORDER`.
+- **Graceful Capability Degradation**: Automatically emits 24-bit TrueColor, degrades to 256 or 16-color ANSI, and suppresses all ANSI escapes under `NO_COLOR`, `OODA_NO_COLOR`, or `TERM=dumb`.
 
 ---
 
-## 5. Agent Surface (MCP stdio)
+## 5. Native systemd Citizenship & Linux Integration
 
-The MCP server is a first-class surface, not an afterthought.
+This server follows a pure systemd-native architectural pattern:
 
-1. **stdio only**: `oogrep --mcp` speaks JSON-RPC over stdin/stdout. No socket, no port, no daemon, no discovery service.
-2. **Bounded Output**: Every tool result truncates at `max_chars`, defaulting to 4000 and clamped to 65536. An agent has a finite context window; a tool that floods it is a broken tool.
-3. **Fail Closed**: An unparsable pattern, an out-of-scope path, or an unknown method returns a structured error object. Never an empty success.
-4. **Protocol Discipline**: `tools/call` before `initialize` returns `-32600`. Shutdown and exit are terminal.
+1. **System Services & Unit Placement**: Services managed in `/etc/systemd/system/`. Prefer drop-in overrides (`/etc/systemd/system/<unit>.service.d/*.conf`).
+2. **Declarative State & Provisioning**: Accounts declared via `systemd-sysusers` in `/etc/sysusers.d/*.conf`; directory lifecycle via `systemd-tmpfiles` in `/etc/tmpfiles.d/*.conf`.
+3. **Service Confinement & Hardening**: Use native sandboxing (`ProtectSystem=`, `ProtectHome=`, `PrivateTmp=`, `NoNewPrivileges=`).
+4. **Logging & Schedulers**: Logging handled exclusively by `systemd-journald`. Scheduled tasks executed via `systemd.timer` units rather than legacy cron.
+5. **Standard System Directories**: Use `$RUNTIME_DIRECTORY` (`/run/openooda`), `$STATE_DIRECTORY` (`/var/lib/openooda`), `$CONFIGURATION_DIRECTORY` (`/etc/openooda`).
+6. **Exit Code Contract**: Strict GNU grep parity:
+   - `0`: At least one match found.
+   - `1`: Search completed with no matches found.
+   - `2`: Trouble / fault: bad options, unreadable path, or permission denial.
 
 ---
 
-## 6. Verification & QA Gate
+## 6. Domain Architecture & Responsibilities
+
+Work lands in exactly one domain at a time:
+
+| Domain | Responsibility | Does NOT Do |
+|---|---|---|
+| `walk/` | Produces and filters candidate files (traversal, globs, .gitignore) | Regex matching or rendering |
+| `match/` | Candidate path + compiled pattern into ranked `Hit` records | Touch filesystem or terminal color |
+| `render/` | Transform `Hit` records into colored terminal lines | Re-read filesystem or filter candidates |
+| `mcp/` | Model Context Protocol stdio server (`grep_search`) | Duplicate search or match logic |
+
+---
+
+## 7. Verification & QA Gate
 
 Before any commit or release is certified, the entire codebase must pass the automated verification gate:
 
-1. **`make check`**: Full syntax and semantic verification via `oodac check` across every `.oo` page.
-2. **`make line-cap`**: Hard verification that 100% of `.oo` and `.oot` files are between 16 and 256 lines, honouring the shim exemption.
+1. **`make line-cap`**: Hard verification that 100% of `.oo` and `.oot` files are between 16 and 256 lines (shims exempt).
+2. **`make file-law`**: Verification that no forbidden file extensions or stray documents are committed.
 3. **`make academy`**: Verification that every source file contains the complete 4-element Academy header in its first 7 lines.
-4. **`make density`**: Verification that no directory holds more than 8 pages, tests included.
-5. **`make file-law`**: Verification that no forbidden file extensions or stray documents are committed.
-6. **`make parity`**: Verification that compiled release binaries match verified hashes.
-7. **`make all`**: Full clean build (`dist/oogrep`), double-run test execution ($Run_1 == Run_2$), and zero warnings.
-8. **`make pure`**: Audit that committed test steps assert through openOODA-built tools only (the binary itself, oojq). No python, stock grep, or jq in any test step.
-
-All eight run under `make verify`. The header check is strict about position: all four Academy elements must land within the first 7 lines, so a multi-line `Setup:` block pushes `Beats:` out of range and fails the build. Put supplementary notes *below* the `Beats:` block.
+4. **`make density`**: Verification that no directory holds more than 8 pages.
+5. **`make check`**: Full syntax and semantic verification via `oodac check` across every `.oo` page.
+6. **`make pure`**: Audit that committed test steps assert through openOODA-built tools only.
+7. **`make verify`**: Orchestrates all verification checks. Red pages fail the build.
+8. **Double-Run Determinism**: All verification runs execute twice sequentially in fresh processes ($Run_1 == Run_2$).
