@@ -355,6 +355,7 @@ package-arch: $(BIN)
 	@rm -rf dist/arch-pkg
 	@bash -n packaging/arch/PKGBUILD
 	@cp packaging/arch/PKGBUILD packaging/PKGBUILD
+	@cp packaging/arch/PKGBUILD dist/PKGBUILD
 	@echo "built dist/oogrep-$(VERSION)-1-x86_64.pkg.tar.zst and validated PKGBUILD"
 
 package: package-deb package-rpm package-arch

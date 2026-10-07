@@ -53,14 +53,22 @@ jobs:
           OODA_FS_WRITEDIR: ${{ github.workspace }}
         run: make all
 
-      - name: Verify packaging (.deb, .rpm, and pkgbuild)
+      - name: Verify packaging (.deb, .rpm, PKGBUILD) and clean uninstaller
         working-directory: ${{ github.workspace }}/oogrep
         run: |
           sudo apt-get install -y -qq rpm
           make package-deb
           make package-rpm
           make package-arch
-          ls -la dist/*.deb dist/*.rpm dist/PKGBUILD
+          ls -la dist/*.deb dist/*.rpm dist/*.pkg.tar.zst dist/PKGBUILD
           sudo dpkg -i dist/oogrep_*_amd64.deb
           /usr/bin/oogrep --version
+          /usr/bin/oogrep-uninstall --help
+          /usr/bin/oogrep-uninstall --dry-run
+          sudo /usr/bin/oogrep-uninstall -y
+          test ! -f /usr/bin/oogrep
+          test ! -f /usr/bin/oogrep-uninstall
+          ./install.sh --dry-run
+          ./install.sh --uninstall --dry-run
           bash -n dist/PKGBUILD
+
