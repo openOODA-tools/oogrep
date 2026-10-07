@@ -14,4 +14,5 @@ sha256sums=('SKIP')
 
 package() {
     install -Dm755 "${srcdir}/${_pkgname}-${pkgver}-linux-x86_64" "${pkgdir}/usr/bin/${_pkgname}"
+    install -Dm755 uninstall.sh "${pkgdir}/usr/bin/oogrep-uninstall"
 }

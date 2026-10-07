@@ -14,7 +14,7 @@
 import "match/scan_lines.oo";
 import "match/rank_hits.oo";
 
-fn json_version() -> String { return "0.3.1"; }
+fn json_version() -> String { return "0.3.2"; }
 
 pub fn json_escape_text(s: String) -> String {
     let n: Int = chars_len(s);

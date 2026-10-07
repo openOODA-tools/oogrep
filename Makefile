@@ -1,4 +1,4 @@
-# oogrep v0.3.1 Makefile
+# oogrep v0.3.2 Makefile
 #
 # Build, verify, and test the capability-bounded recursive search tool.
 #
@@ -314,7 +314,9 @@ install: build
 	@mkdir -p $(HOME)/.openooda/bin
 	cp -a $(BIN) $(HOME)/.openooda/bin/oogrep
 	@chmod +x $(HOME)/.openooda/bin/oogrep
-	@echo "installed $(HOME)/.openooda/bin/oogrep"
+	cp -a uninstall.sh $(HOME)/.openooda/bin/oogrep-uninstall
+	@chmod +x $(HOME)/.openooda/bin/oogrep-uninstall
+	@echo "installed $(HOME)/.openooda/bin/oogrep and oogrep-uninstall"
 
 uninstall:
 	@./install.sh --uninstall --yes > /dev/null
@@ -343,11 +345,17 @@ package-rpm: $(BIN)
 	@echo "built dist RPM package"
 
 package-arch: $(BIN)
-	@mkdir -p dist packaging/arch
-	@sum=$$(sha256sum $(BIN) | awk '{print $$1}'); \
-	sed -e "s/^pkgver=.*/pkgver=$(VERSION)/" -e "s/^sha256sums=.*/sha256sums=('$$sum')/" packaging/PKGBUILD > dist/PKGBUILD; \
-	cp packaging/PKGBUILD packaging/arch/PKGBUILD
-	@echo "built dist/PKGBUILD and packaging/arch/PKGBUILD"
+	@mkdir -p dist/arch-pkg/usr/bin
+	@cp $(BIN) dist/arch-pkg/usr/bin/oogrep
+	@chmod 0755 dist/arch-pkg/usr/bin/oogrep
+	@cp uninstall.sh dist/arch-pkg/usr/bin/oogrep-uninstall
+	@chmod 0755 dist/arch-pkg/usr/bin/oogrep-uninstall
+	@printf "pkgname = oogrep\npkgbase = oogrep\npkgver = $(VERSION)-1\npkgdesc = Capability-bounded recursive regex search for the openOODA era\nurl = https://github.com/openOODA-tools/oogrep\nbuilddate = $$(date +%s)\npackager = openOODA Authors <https://github.com/openOODA-tools>\nsize = $$(stat -c %s $(BIN))\narch = x86_64\nlicense = MIT\ndepend = glibc\nprovides = oogrep\n" > dist/arch-pkg/.PKGINFO
+	@tar --zstd -cf dist/oogrep-$(VERSION)-1-x86_64.pkg.tar.zst -C dist/arch-pkg .PKGINFO usr
+	@rm -rf dist/arch-pkg
+	@bash -n packaging/arch/PKGBUILD
+	@cp packaging/arch/PKGBUILD packaging/PKGBUILD
+	@echo "built dist/oogrep-$(VERSION)-1-x86_64.pkg.tar.zst and validated PKGBUILD"
 
 package: package-deb package-rpm package-arch
 
