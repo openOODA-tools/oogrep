@@ -303,6 +303,8 @@ test: $(BIN)
 	@./install.sh --verify > /dev/null && echo "PASS: install.sh --verify"
 	@./$(BIN) -i -q "Recursive Search" install.sh && echo "PASS: install.sh banner text"
 	@{ ./$(BIN) -i -q "oosh" install.sh; test $$? -ne 0; } && echo "PASS: install.sh no oosh"
+	@echo "=== testing uninstaller ==="
+	@./install.sh --uninstall --dry-run > /dev/null && echo "PASS: install.sh --uninstall --dry-run"
 
 
 parity: build
@@ -313,6 +315,10 @@ install: build
 	cp -a $(BIN) $(HOME)/.openooda/bin/oogrep
 	@chmod +x $(HOME)/.openooda/bin/oogrep
 	@echo "installed $(HOME)/.openooda/bin/oogrep"
+
+uninstall:
+	@./install.sh --uninstall --yes > /dev/null
+	@echo "uninstalled oogrep"
 
 VERSION ?= 0.3.1
 

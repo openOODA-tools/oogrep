@@ -57,8 +57,23 @@ curl -fsSL https://openooda-tools.github.io/oogrep/install.sh | bash -s -- --dry
 # Verify cryptographic SHA-256 seal only
 curl -fsSL https://openooda-tools.github.io/oogrep/install.sh | bash -s -- --verify
 
-# Uninstall (removes binary or package)
+### Clean Uninstallation
+`oogrep` equips a dedicated clean uninstaller alongside the binary, and includes full uninstallation in the web installer:
+
+```bash
+# Via the local uninstaller helper (situated alongside oogrep)
+oogrep-uninstall
+
+# Or via the universal web installer
 curl -fsSL https://openooda-tools.github.io/oogrep/install.sh | bash -s -- --uninstall
+
+# Non-interactive removal (for scripts and CI)
+oogrep-uninstall --yes
+# or: curl -fsSL https://openooda-tools.github.io/oogrep/install.sh | bash -s -- --uninstall --yes
+
+# Dry-run simulation (previews actions without modifying host)
+oogrep-uninstall --dry-run
+# or: curl -fsSL https://openooda-tools.github.io/oogrep/install.sh | bash -s -- --uninstall --dry-run
 ```
 
 ---
